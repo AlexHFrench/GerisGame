@@ -46,9 +46,9 @@ class Board:
     """
 
     def __init__(self, initial_positions=range(8)):
-        self.backup = None
+        self.temp, self.white_in_check, self.black_in_check = None, False, False
         colour_generator = white_black()
-        self.squares = [[Empty(next(colour_generator)) for _ in range(8)] for _ in range(8)]
+        self.squares = [[Empty(next(colour_generator), (row, col)) for col in range(8)] for row in range(8)]
         for row in STARTING_ROWS:
             for col in range(8):
                 if row == 0 and col in initial_positions:  # only instantiate pieces indicated by the type of game
@@ -63,11 +63,7 @@ class Board:
                 if row == 7 and col in initial_positions:
                     type_ = BACK_LINE[col]
                     self.squares[row][col] = eval(type_)('White', self, (row, col))
-
-        for row, col in ((x, y) for x in range(8) for y in range(8)):  # give pieces vision of the board
-            square = self.squares[row][col]
-            if isinstance(square, Piece):
-                square.look(self)
+        self.update_pieces()
 
     def __str__(self, ):
         """ return a printable, human-readable string representation of the board in its current state
@@ -88,37 +84,80 @@ class Board:
         """ remove all pieces from an already extant Board object
         """
         colour_generator = white_black()
-        self.squares = [[Empty(next(colour_generator)) for _ in range(8)] for _ in range(8)]
+        self.squares = [[Empty(next(colour_generator), (row, col)) for col in range(8)] for row in range(8)]
 
-    def move(self, start_square, fin_square):
-        """ move object from start_square to fin_square; remove residue of object from start_square
-            accepts squares in SAN chess notation
-        """
-        pass
+    def update_pieces(self):
+        for row, col in ((x, y) for x in range(8) for y in range(8)):  # give pieces vision of the board
+            square = self.squares[row][col]
+            if isinstance(square, Piece):
+                square.look(self)
 
-    def get_pieces(self, colour=None, kind=None, line_of_sight=None):
+    def get_pieces(self, colour=None, type_=None, line_of_sight=None):
         """ Returns all pieces on the board which match the given criteria. """
         pieces = flatten(self.squares)
         pieces = filter(lambda x: isinstance(x, Piece), pieces)
         if colour:
             pieces = filter(lambda x: x.colour == colour, pieces)
-        if kind:
-            pieces = filter(lambda x: isinstance(x, eval(kind)), pieces)
+        if type_:
+            pieces = filter(lambda x: isinstance(x, eval(type_)), pieces)
         if line_of_sight:
             pieces = filter(lambda x: line_of_sight in x.avail_moves
                             or line_of_sight in x.avail_captures, pieces)
         pieces = list(pieces)
         return pieces
 
+    def move(self, active_piece, target_location):
+        """ Move active_piece from present location to target_location
+            Empty [square] objects are stored in active_piece.temp while checks are made for legality of move
+            In case of capture: active_piece.temp = target_piece s.t. target_piece.temp = Empty object
+        """
+        start_row, start_col = active_piece.location
+        end_row, end_col = target_location
+
+        self.squares[start_row][start_col] = active_piece.temp  # replace Empty object in active_piece's location
+        active_piece.temp = self.squares[end_row][end_col]  # store content of target_location in active_piece's .temp
+        self.squares[end_row][end_col] = active_piece  # place active_piece in target_location
+
+        pieces = self.get_pieces()
+        for piece in pieces:
+            piece.look()
+
+        # CHECK FOR CHECKS AGAINST KING OF active_piece
+        if active_piece.colour in self.in_check():
+            # Player either moved into check or ignored an already extant check on the board
+            self.squares[end_row][end_col] = active_piece.temp
+            active_piece.temp = self.squares[start_row][start_col]
+            # Raise an IllegalMove error
+            pass
+        else:
+            # if capture: move target_piece to self.sideboard and active_piece.temp = target_location's Empty object
+            pass
+
+    def in_check(self):
+        who_in_check = []
+        for colour in COLOURS:
+            king, = self.get_pieces(colour, 'King')
+            target_location = king.location
+            opp_colour, = [x for x in COLOURS if x != colour]
+            checking_pieces = self.get_pieces(opp_colour, line_of_sight=target_location)
+            if checking_pieces:
+                who_in_check.append(colour)
+        return who_in_check
+
 
 class Empty:
     """ Empty square, place holder object. Has a colour."""
 
-    def __init__(self, colour):
+    def __init__(self, colour, location):
         self.colour = colour
+        self.location = location
 
     def __str__(self):
-        return '―' 
+        return '―'
+
+    def __repr__(self):
+        san_loc = convert_board2san(self.location)
+        return '― >> ' + san_loc
 
 
 class Piece:
@@ -140,11 +179,11 @@ class Piece:
     """
 
     def __init__(self, colour, board, location, has_moved=False):
-        self.avail_moves, self.avail_captures, self.supporting = set(), set(), set()
-        self.pattern, self.steps = None, None
+        self.avail_moves, self.avail_captures, self.supporting = set(), set(), set()  # piece vision
+        self.pattern, self.steps = None, None  # pattern of movement allowed in the rules
         self.colour = colour
         self.location = location
-        self.square = board.squares[location[0]][location[1]]
+        self.temp = board.squares[location[0]][location[1]]  # important during piece capture and elsewhere
         self.has_moved = has_moved  # important for castling, double-step pawn moves and captures en-passant
         self.char = UNICODES[self.colour][self.__class__.__name__]
 
@@ -159,7 +198,8 @@ class Piece:
         return '\n' + str(self) + '\n'\
             'colour: ' + self.colour + '\n'\
             'location: ' + str(self.location) + '\n'\
-            '.. in SAN: ' + convert_board2san(self.location) + '\n'\
+            '.. in SAN: ' + convert_board2san(self.location) + '\n' \
+            '.. in temp: ' + repr(self.temp) + '\n' \
             'available moves: ' + str(avail_moves) + '\n'\
             'available captures: ' + str(avail_captures) + '\n' \
             'supporting: ' + str(supporting) + '\n' \
@@ -167,6 +207,7 @@ class Piece:
 
     def look(self, board):
         """Piece populates self.avail_moves and self.avail_captures with legal board indices."""
+        self.avail_moves, self.avail_captures, self.supporting = set(), set(), set()
         for i, j in self.pattern:
             new_row = self.location[0] + i
             new_col = self.location[1] + j
@@ -302,7 +343,7 @@ class Queen(Piece):
             ATR:
                 move_rules
             METH:
-    
+
     """
 
     def __init__(self, colour, board, location, has_moved=False):
@@ -319,7 +360,6 @@ def get_player_move():
     """ returns a move selected by the player in SAN
     """
     player_input = input('What is your move?\n\t:\t')
-
     return player_input
 
 
@@ -474,8 +514,10 @@ def MAIN_VARIABLES():
 
     """ --------------------------- MAIN VARIABLES
     """
-    global VALUES, LETTERS, PATTERNS, STEPS, UNICODES, STARTING_ROWS, STANDARD_GAME
+    global COLOURS, VALUES, LETTERS, PATTERNS, STEPS, UNICODES, STARTING_ROWS, STANDARD_GAME
     global KING_AND_PAWN_GAME, MINOR_GAME, MAJOR_GAME, FRONT_LINE, BACK_LINE, ROWS, FILES
+
+    COLOURS = ['White', 'Black']
 
     VALUES = {
         'Pawn': 1,
@@ -539,7 +581,7 @@ def MAIN_VARIABLES():
 
     # Columns on which pieces start the game
     STANDARD_GAME = (0, 1, 2, 3, 4, 5, 6, 7)  # all pieces
-    KING_AND_PAWN_GAME = (4,)  # only the king
+    KING_AND_PAWN_GAME = 4,  # only the king
     MINOR_GAME = (1, 2, 4, 5, 6)  # minor pieces + king
     MAJOR_GAME = (0, 3, 4, 7)  # major pieces + king
 
@@ -560,6 +602,13 @@ if __name__ == '__main__':
     """
 
     MAIN_VARIABLES()
+
+    board = Board()
+    print(board)
+
+    print(board.get_pieces('White', 'Bishop'))
+
+
 
 
 

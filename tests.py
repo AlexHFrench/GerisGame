@@ -2,6 +2,8 @@
 """ This file houses the suite of tests for main.py classes and functions
 
 """
+
+
 """ TEST FUNCTIONS -------------------------------------------------------------------------------------- TEST FUNCTIONS
 """
 
@@ -49,7 +51,7 @@ def coord_conversions(coords):
 
     for elem in coords:
         print('\n' + str(elem[1]) + ' :')
-        conversion = main.convert_board2san(elem[1])
+        conversion = main.convertboard2san(elem[1])
         try:
             assert conversion == elem[0]
         except AssertionError:
@@ -71,10 +73,35 @@ def test_legal(coords):
 
 
 def repr_pieces(board):
-    for row, rank in enumerate(board.squares):
+    for rank in board.squares:
         for piece in rank:
             if isinstance(piece, main.Piece):
                 print(repr(piece))
+
+
+def what_checks(board, pieces):
+    positions = (0, 3, 4, 7)
+    for index, piece in enumerate(pieces):
+        type_ = piece[1]
+        board.squares[0][positions[index]] = eval(type_)(piece[0], board, (0, positions[index]))
+    print(board)
+    board.update_pieces()
+    return board.in_check()
+
+
+def test_all_checks(board):
+    black_in_check = (('Black', 'King'), ('White', 'Queen'), ('White', 'King'))
+    white_in_check = (('White', 'King'), ('Black', 'Queen'), ('Black', 'King'))
+    both_in_check = (('White', 'King'), ('Black', 'Queen'), ('White', 'Queen'), ('Black', 'King'))
+    no_checks = (('White', 'King'), ('Black', 'King'))
+
+    print('BLACK_IN_CHECK has checks: ' + str(what_checks(board, black_in_check)))
+    board.clear()
+    print('WHITE_IN_CHECK has checks: ' + str(what_checks(board, white_in_check)))
+    board.clear()
+    print('BOTH_IN_CHECK has checks: ' + str(what_checks(board, both_in_check)))
+    board.clear()
+    print('NO_CHECKS has checks: ' + str(what_checks(board, no_checks)))
 
 
 """ MAIN ---------------------------------------------------------------------------------------------------------- MAIN
@@ -84,7 +111,8 @@ if __name__ == '__main__':
     """ Primary imports and initialisation -----------------------------------------------------------------------------
     """
     import main
-    main.MAIN_VARIABLES()
+    from main import Board, Piece, King, Queen, Knight, Bishop, Rook, Pawn, MAIN_VARIABLES
+    MAIN_VARIABLES()
     """ Local imports and initialisation -----------------------------------------------------------------------------
     """
     SAN_TEST_STRINGS = (
@@ -125,10 +153,11 @@ if __name__ == '__main__':
     for i in range(1, 45):
         SERIES_OF_LEGAL_MOVES.remove(str(i) + '.')
 
+
     """ Main -----------------------------------------------------------------------------------------------------------
     """
 
-    board = main.Board()
+    board = Board()
     print(board)
 
     # board_initialisations()
@@ -136,6 +165,11 @@ if __name__ == '__main__':
     # coord_conversions(COORDS)
     # repr_pieces(board)
     # test_legal(LEGAL_TEST)
+    # print(board.get_pieces('White', 'King'))
+    # board.clear()
+    # test_all_checks(board)
 
-    print(board.get_pieces('White', 'Pawn', main.convert_san2board('h4')))
+    board = Board()
+
+
 
