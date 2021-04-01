@@ -543,14 +543,6 @@ def MAIN_VARIABLES():
     MINOR_GAME = (1, 2, 4, 5, 6)  # minor pieces + king
     MAJOR_GAME = (0, 3, 4, 7)  # major pieces + king
 
-    # Holds all game-type - used in tests.py
-    GAME_TYPES = (
-        STANDARD_GAME,
-        KING_AND_PAWN_GAME,
-        MINOR_GAME,
-        MAJOR_GAME,
-    )
-
     # Pieces in the order they appear on the board
     FRONT_LINE = ('Pawn', 'Pawn', 'Pawn', 'Pawn', 'Pawn', 'Pawn', 'Pawn', 'Pawn')
     BACK_LINE = ('Rook', 'Knight', 'Bishop', 'Queen', 'King', 'Bishop', 'Knight', 'Rook')

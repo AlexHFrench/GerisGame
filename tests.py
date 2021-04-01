@@ -138,3 +138,4 @@ if __name__ == '__main__':
     # test_legal(LEGAL_TEST)
 
     print(board.get_pieces('White', 'Pawn', main.convert_san2board('h4')))
+
