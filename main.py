@@ -26,7 +26,8 @@ NOTE:
         'board indices'; the pair of indices (row, col) indexing a square (board.squares[row][col])
 
 """
-from util.utils import n_ary
+""" CLASSES ------------------------------------------------------------------------------------------------------------
+"""
 
 
 class Board:
@@ -349,100 +350,6 @@ def flatten(l, ltypes=(list, tuple)):
     return ltype(l)
 
 
-""" GLOBAL IMPORT & VARIABLE DEFINITIONS -------------------------------------------------------------------------------
-"""
-
-
-def MAIN_VARIABLES():
-    """ All variables and imports for the main logic of the program
-        I separated this into a function to make tests.py function more cleanly
-    """
-    """ --------------------------- IMPORTS
-        """
-    global re
-
-    import re
-
-    """ --------------------------- MAIN VARIABLES
-    """
-    global VALUES, LETTERS, PATTERNS, STEPS, UNICODES, STARTING_ROWS, STANDARD_GAME
-    global KING_AND_PAWN_GAME, MINOR_GAME, MAJOR_GAME, FRONT_LINE, BACK_LINE, ROWS, FILES
-
-    VALUES = {
-        'Pawn': 1,
-        'Rook': 5,
-        'Knight': 3,
-        'Bishop': 3,
-        'King': 100,
-        'Queen': 9,
-    }
-
-    LETTERS = {
-        'P': 'Pawn',
-        'R': 'Rook',
-        'N': 'Knight',
-        'B': 'Bishop',
-        'K': 'King',
-        'Q': 'Queen',
-    }
-
-    PATTERNS = {
-        'Pawn': [(1, 1), (1, -1)],
-        'Rook': [(1, 0), (0, 1), (-1, 0), (0, -1)],
-        'Knight': [(1, 2), (2, 1), (-1, 2), (2, -1), (-2, 1), (1, -2), (-1, -2), (-2, -1)],
-        'Bishop': [(1, 1), (1, -1), (-1, 1), (-1, -1)],
-        'King': [(0, 1), (1, 0), (1, 1), (-1, 0), (0, -1), (-1, 1), (1, -1), (-1, -1)],
-        'Queen': [(0, 1), (1, 0), (1, 1), (-1, 0), (0, -1), (-1, 1), (1, -1), (-1, -1)],
-    }
-
-    STEPS = {
-        'Pawn': 1,
-        'Rook': 7,
-        'Knight': 1,
-        'Bishop': 7,
-        'King': 1,
-        'Queen': 7,
-    }
-
-    # The following have been designated THE WRONG WAY AROUND for the purposes of appearing more visually correct
-    # on a white-black-inverted terminal window
-    UNICODES = {
-        'Black': {
-            'Pawn': '♙',
-            'Rook': '♖',
-            'Knight': '♘',
-            'Bishop': '♗',
-            'King': '♔',
-            'Queen': '♕',
-        },
-        'White': {
-            'Pawn': '♟',
-            'Rook': '♜',
-            'Knight': '♞',
-            'Bishop': '♝',
-            'King': '♚',
-            'Queen': '♛',
-        },
-    }
-
-    # rows on which pieces start the game (the first and last two)
-    STARTING_ROWS = (7, 6, 1, 0)
-
-    # columns on which pieces start the game
-    STANDARD_GAME = (0, 1, 2, 3, 4, 5, 6, 7)  # all pieces
-    KING_AND_PAWN_GAME = (4,)  # only the king
-    MINOR_GAME = (1, 2, 4, 5, 6)  # minor pieces + king
-    MAJOR_GAME = (0, 3, 4, 7)  # major pieces + king
-
-    # pieces in the order they appear on the board
-    FRONT_LINE = ('Pawn', 'Pawn', 'Pawn', 'Pawn', 'Pawn', 'Pawn', 'Pawn', 'Pawn')
-    BACK_LINE = ('Rook', 'Knight', 'Bishop', 'Queen', 'King', 'Bishop', 'Knight', 'Rook')
-
-    # Ranks and Files
-    ROWS = (1, 2, 3, 4, 5, 6, 7, 8)
-    FILES = {'a': 0, 'b': 1, 'c': 2, 'd': 3, 'e': 4, 'f': 5, 'g': 6, 'h': 7}
-
-
 """ CONVERSIONS --------------------------------------------------------------------------------------------------------
 """
 
@@ -552,149 +459,115 @@ def decompose_san(san):
     return tuple(result)
 
 
-""" ----------------------------------------------------- TESTS --------------------------------------------------------
+""" GLOBAL IMPORT & VARIABLE DEFINITIONS -------------------------------------------------------------------------------
 """
 
 
-def board_initialisations(game_types):
-    for i in game_types:
-        print(Board(i))
+def MAIN_VARIABLES():
+    """ All variables and imports for the main logic of the program
+        I separated this into a function to make tests.py function more cleanly
+    """
+    """ --------------------------- IMPORTS
+        """
+    global re
+    import re
 
+    """ --------------------------- MAIN VARIABLES
+    """
+    global VALUES, LETTERS, PATTERNS, STEPS, UNICODES, STARTING_ROWS, STANDARD_GAME
+    global KING_AND_PAWN_GAME, MINOR_GAME, MAJOR_GAME, FRONT_LINE, BACK_LINE, ROWS, FILES
 
-def san_validation_decomposition(san_test_strings, string_decompositions):
-    for i, elem in enumerate(san_test_strings):
-        print('\n' + elem + ' :')
-        try:
-            assert validate_san(elem)
-        except AssertionError:
-            print('san FAILED to validate')
-        else:
-            print('validation: PASSED')
-        decomposition = decompose_san(elem)
-        print(decomposition)
-        try:
-            assert decomposition == string_decompositions[i]
-        except AssertionError:
-            print('san FAILED to decompose')
-            print('got instead: ' + str(decomposition))
-        else:
-            print('decomposition: PASSED >>')
-            print(decomposition)
+    VALUES = {
+        'Pawn': 1,
+        'Rook': 5,
+        'Knight': 3,
+        'Bishop': 3,
+        'King': 100,
+        'Queen': 9,
+    }
 
+    LETTERS = {
+        'P': 'Pawn',
+        'R': 'Rook',
+        'N': 'Knight',
+        'B': 'Bishop',
+        'K': 'King',
+        'Q': 'Queen',
+    }
 
-def coord_conversions(coords):
-    for elem in coords:
-        print('\n' + elem[0] + ' :')
-        conversion = convert_san2board(elem[0])
-        try:
-            assert conversion == elem[1]
-        except AssertionError:
-            print('san FAILED to convert')
-            print('got instead: ' + str(conversion))
-        else:
-            print('conversion: PASSED >>')
-            print(conversion)
+    PATTERNS = {
+        'Pawn': [(1, 1), (1, -1)],
+        'Rook': [(1, 0), (0, 1), (-1, 0), (0, -1)],
+        'Knight': [(1, 2), (2, 1), (-1, 2), (2, -1), (-2, 1), (1, -2), (-1, -2), (-2, -1)],
+        'Bishop': [(1, 1), (1, -1), (-1, 1), (-1, -1)],
+        'King': [(0, 1), (1, 0), (1, 1), (-1, 0), (0, -1), (-1, 1), (1, -1), (-1, -1)],
+        'Queen': [(0, 1), (1, 0), (1, 1), (-1, 0), (0, -1), (-1, 1), (1, -1), (-1, -1)],
+    }
 
-    for elem in coords:
-        print('\n' + str(elem[1]) + ' :')
-        conversion = convert_board2san(elem[1])
-        try:
-            assert conversion == elem[0]
-        except AssertionError:
-            print('san FAILED to convert')
-            print('got instead: ' + str(conversion))
-        else:
-            print('conversion: PASSED >>')
-            print(conversion)
+    STEPS = {
+        'Pawn': 1,
+        'Rook': 7,
+        'Knight': 1,
+        'Bishop': 7,
+        'King': 1,
+        'Queen': 7,
+    }
 
+    # The following have been designated THE WRONG WAY AROUND for the purposes of appearing more visually correct
+    # on a white-black-inverted terminal window
+    UNICODES = {
+        'Black': {
+            'Pawn': '♙',
+            'Rook': '♖',
+            'Knight': '♘',
+            'Bishop': '♗',
+            'King': '♔',
+            'Queen': '♕',
+        },
+        'White': {
+            'Pawn': '♟',
+            'Rook': '♜',
+            'Knight': '♞',
+            'Bishop': '♝',
+            'King': '♚',
+            'Queen': '♛',
+        },
+    }
 
-def test_legal(coords):
-    for coord in coords:
-        print(coord)
-        a, b = coord
-        if legal(a, b):
-            print('LEGAL')
-        else:
-            print('NOT LEGAL!')
+    # rows on which pieces start the game (the first and last two)
+    STARTING_ROWS = (7, 6, 1, 0)
 
+    # Columns on which pieces start the game
+    STANDARD_GAME = (0, 1, 2, 3, 4, 5, 6, 7)  # all pieces
+    KING_AND_PAWN_GAME = (4,)  # only the king
+    MINOR_GAME = (1, 2, 4, 5, 6)  # minor pieces + king
+    MAJOR_GAME = (0, 3, 4, 7)  # major pieces + king
 
-def repr_pieces(board):
-    for row, rank in enumerate(board.squares):
-        for piece in rank:
-            if isinstance(piece, Piece):
-                print(repr(piece))
-
-
-""" ---------------------------------------------- END OF TESTS --------------------------------------------------------
-"""
-
-
-def tests():
-    game_types = (
+    # Holds all game-type - used in tests.py
+    GAME_TYPES = (
         STANDARD_GAME,
         KING_AND_PAWN_GAME,
         MINOR_GAME,
         MAJOR_GAME,
     )
-    san_test_strings = (
-        'e4', 'Nxf5', 'exd4', 'Rdf8', 'R1a3', 'Qh4e1',
-        'Qh4xe1+', 'e8Q', 'fxe8Q#', 'f8N', '0-0', '0-0-0',
-    )
-    string_decompositions = (
-        ('Pawn', '', False, 'e4', '', '', ''),
-        ('Knight', '', True, 'f5', '', '', ''),
-        ('Pawn', 'e', True, 'd4', '', '', ''),
-        ('Rook', 'd', False, 'f8', '', '', ''),
-        ('Rook', '1', False, 'a3', '', '', ''),
-        ('Queen', 'h4', False, 'e1', '', '', ''),
-        ('Queen', 'h4', True, 'e1', '', '+', ''),
-        ('Pawn', '', False, 'e8', 'Queen', '', ''),
-        ('Pawn', 'f', True, 'e8', 'Queen', '#', ''),
-        ('Pawn', '', False, 'f8', 'Knight', '', ''),
-        ('King', '', False, '', '', '', 'King'),
-        ('King', '', False, '', '', '', 'Queen'),
-    )
-    coords = (
-        ('e4', (4, 4)),
-        ('a1', (7, 0)),
-        ('a8', (0, 0)),
-        ('h1', (7, 7)),
-        ('h8', (0, 7)),
-        ('d3', (5, 3))
-    )
-    legal_test = [(x, 4) for x in range(-2, 10)] + [(4, x) for x in range(-2, 10)]
-    kasparov_topalov_wijkaanzee_1999 = '1. e4 d6 2. d4 Nf6 3. Nc3 g6 4. Be3 Bg7 5. Qd2 c6 6. f3 b5 7. Nge2 Nbd7 '\
-        '8. Bh6 Bxh6 9. Qxh6 Bb7 10. a3 e5 11. O-O-O Qe7 12. Kb1 a6 13. Nc1 O-O-O 14. Nb3 exd4 15. Rxd4 c5 '\
-        '16. Rd1 Nb6 17. g3 Kb8 18. Na5 Ba8 19. Bh3 d5 20. Qf4+ Ka7 21. Rhe1 d4 22. Nd5 Nbxd5 23. exd5 Qd6 '\
-        '24. Rxd4 cxd4 25. Re7+ Kb6 26. Qxd4+ Kxa5 27. b4+ Ka4 28. Qc3 Qxd5 29. Ra7 Bb7 30. Rxb7 Qc4 31. Qxf6 Kxa3 '\
-        '32. Qxa6+ Kxb4 33. c3+ Kxc3 34. Qa1+ Kd2 35. Qb2+ Kd1 36. Bf1 Rd2 37. Rd7 Rxd7 38. Bxc4 bxc4 39. Qxh8 Rd3 '\
-        '40. Qa8 c3 41. Qa4+ Ke1 42. f4 f5 43. Kc1 Rd2 44. Qa7'
-    series_of_legal_moves = kasparov_topalov_wijkaanzee_1999.split()
-    for i in range(1, 45):
-        series_of_legal_moves.remove(str(i) + '.')
 
-    board = Board()
+    # Pieces in the order they appear on the board
+    FRONT_LINE = ('Pawn', 'Pawn', 'Pawn', 'Pawn', 'Pawn', 'Pawn', 'Pawn', 'Pawn')
+    BACK_LINE = ('Rook', 'Knight', 'Bishop', 'Queen', 'King', 'Bishop', 'Knight', 'Rook')
 
-    # board_initialisations(game_types)
-    # san_validation_decomposition(san_test_strings, string_decompositions)
-    # coord_conversions(coords)
-    # repr_pieces(board)
-    # test_legal(legal_test)
-
-    print(board)
-    print(board.get_pieces('White', 'Pawn', convert_san2board('h4')))
+    # Ranks and Files
+    ROWS = (1, 2, 3, 4, 5, 6, 7, 8)
+    FILES = {'a': 0, 'b': 1, 'c': 2, 'd': 3, 'e': 4, 'f': 5, 'g': 6, 'h': 7}
 
 
-""" -------------------------------------- MAIN ----------------------- MAIN -------------------------------------------
+""" MAIN ---------------------------------------------------------------------------------------------------------- MAIN
 """
-
 
 if __name__ == '__main__':
     """ ------------------------------------------------- MAIN BODY ----------------------------------------------------
     """
 
     MAIN_VARIABLES()
-    tests()
 
 
 
