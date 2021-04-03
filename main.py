@@ -464,10 +464,10 @@ def decompose_san(san):
     result = ['', '', False, '', '', '', '']
 
     if san == '0-0':
-        result = ['King', '', False, '', '', '', 'King']
+        result = ['King', '', False, 'g1 g8', '', '', 'King']
         return tuple(result)
     if san == '0-0-0':
-        result = ['King', '', False, '', '', '', 'Queen']
+        result = ['King', '', False, 'c1 c8', '', '', 'Queen']
         return tuple(result)
     if san.endswith('#'):
         result[5] = '#'
@@ -613,11 +613,11 @@ def disambiguate(candidates, disambiguation):
         elif elem.isalpha():
             start_location[1] = FILES[elem]
     result = None
-    if
     for index, piece in enumerate(candidates):
         piece_location = piece.location
         if start_location[0]:
             if start_location[0] == piece_location[0]:
+                pass
 
 
 
@@ -637,7 +637,7 @@ if __name__ == '__main__':
     # board.move(piece, (4, 4))
     #
     # print(board)
-    # print(repr(board.squares[6][4]))
+    print(repr(board.squares[6][4]))
     # print(repr(board.squares[4][4]))
 
 

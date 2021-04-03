@@ -158,6 +158,8 @@ if __name__ == '__main__':
     board = Board()
     print(board)
 
+    # print(board.get_pieces('White', 'Pawn'))
+
     # board_initialisations()
     # san_validation_decomposition(SAN_TEST_STRINGS, STRING_DECOMPOSITIONS)
     # coord_conversions(COORDS)
@@ -168,21 +170,44 @@ if __name__ == '__main__':
     # test_all_checks(board)
 
     print(SERIES_OF_LEGAL_MOVES)
-    player_turn = 'White'
+    turn_options = (('White', 0), ('Black', 1))
+    player_turn = None
+    move_count = 2
 
-    candidate = SERIES_OF_LEGAL_MOVES[0]
+    for candidate in SERIES_OF_LEGAL_MOVES:
+        player_turn = turn_options[move_count % 2]
+        print(player_turn[0] + "'s turn!")
 
-    if validate_san(candidate):
-        active_piece_type, disambiguation, is_capture,\
-            target_san, promotion_type, _, castles = decompose_san(candidate)
-    else:
-        raise InvalidInput('Move notation failed to validate')
-    if not castles:
-        target_location = convert_san2board(target_san)
-        try:
-            active_piece, = board.get_pieces(player_turn, active_piece_type, target_location)
-            print(active_piece)
-        except ValueError:
+        print(candidate)
+
+        if validate_san(candidate):
+            decomposition = active_piece_type, disambiguation, is_capture,\
+                target_san, promotion_type, _, castles = decompose_san(candidate)
+        else:
+            raise InvalidInput('Move notation failed to validate')
+        print(decomposition)
+        if not castles:
+            target_location = convert_san2board(target_san)
+            active_pieces = board.get_pieces(player_turn[0], active_piece_type, target_location)
+        else:
+            target_sans = target_san.split()
+            target_location = convert_san2board(target_sans[player_turn[1]])
             active_pieces = board.get_pieces(player_turn, active_piece_type, target_location)
+            print('Time to implement castling!')
+        if not active_pieces:
+            raise InvalidInput('No piece able to execute such a move')
+        elif len(active_pieces) == 1:
+            try:
+                active_piece, = active_pieces
+            except ValueError:
+                raise InvalidInput('Disambiguation insufficient: more than one piece able to make this move')
+        else:
+            active_piece = disambiguate(active_pieces, disambiguation)
+        # print('active pieces: ' + str(repr(active_pieces)))
+        # print('active piece: ' + str(repr(active_piece)))
 
+        board.move(active_piece, target_location)
+        print(board)
+
+        move_count += 1
 
