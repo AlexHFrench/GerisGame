@@ -90,6 +90,7 @@ class Board:
         for row, col in ((x, y) for x in range(8) for y in range(8)):  # give pieces vision of the board
             square = self.squares[row][col]
             if isinstance(square, Piece):
+                square.location = (row, col)
                 square.look(self)
 
     def get_pieces(self, colour=None, type_=None, line_of_sight=None):
@@ -112,16 +113,29 @@ class Board:
             In case of capture: active_piece.temp = target_piece s.t. target_piece.temp = Empty object
         """
         print('Starting move procedure..')
-        start_row, start_col = active_piece.location
+        try:
+            start_row, start_col = active_piece.location
+        except AttributeError:
+            print("AttributeError: 'NoneType' object has no attribute 'location'")
+            print(active_piece)
+            print(type(active_piece))
+            print(self.squares[7][6])
+            print(repr(self.squares[7][6]))
         end_row, end_col = target_location
 
         self.squares[start_row][start_col] = active_piece.temp  # replace Empty object in active_piece's location
         active_piece.temp = self.squares[end_row][end_col]  # store content of target_location in active_piece's .temp
         self.squares[end_row][end_col] = active_piece  # place active_piece in target_location
 
+        first_move = False
+        if not active_piece.has_moved:
+            first_move = True
+        active_piece.has_moved = True
+
         # pieces = self.get_pieces()
         # for piece in pieces:
         #     piece.look()
+        print('UPDATING PIECES before check check!')
         self.update_pieces()
 
         # CHECK FOR CHECKS AGAINST KING OF active_piece
@@ -129,6 +143,10 @@ class Board:
             # Player either moved into check or ignored an already extant check on the board
             self.squares[end_row][end_col] = active_piece.temp
             active_piece.temp = self.squares[start_row][start_col]
+            print('UPDATING PIECES due to check found!')
+            if first_move:
+                active_piece.has_moved = False
+            self.update_pieces()
             # Raise an IllegalMove error
             raise IllegalMove(f"{active_piece.colour}'s King is in check!")
         else:
@@ -259,6 +277,7 @@ class Pawn(Piece):
 
     def look(self, board):
         """Piece populates self.avail_moves and self.avail_captures with legal board indices."""
+        self.avail_moves, self.avail_captures, self.supporting = set(), set(), set()
         new_row, _ = row, col = self.location
         if not self.has_moved:
             self.steps = 2
@@ -605,19 +624,21 @@ def MAIN_VARIABLES():
 
 
 def disambiguate(candidates, disambiguation):
-    disambiguation.split()
-    start_location = [None, None]
-    for elem in disambiguation:
-        if elem.isnumeric():
-            start_location[0] = int(elem) - 1
-        elif elem.isalpha():
-            start_location[1] = FILES[elem]
-    result = None
-    for index, piece in enumerate(candidates):
-        piece_location = piece.location
-        if start_location[0]:
-            if start_location[0] == piece_location[0]:
-                pass
+    if len(disambiguation) == 1:
+        if disambiguation.isalpha():
+            col = FILES[disambiguation]
+            results = filter(lambda x: x.location[1] == col, candidates)
+        if disambiguation.isnumeric():
+            results = filter(lambda x: x.location[0] == 8 - int(disambiguation), candidates)
+    else:
+        loc = list(disambiguation)
+        results = filter(lambda x: x.location == loc, candidates)
+    results = list(results)
+    return results
+
+
+
+
 
 
 

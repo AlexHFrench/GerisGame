@@ -189,25 +189,42 @@ if __name__ == '__main__':
         if not castles:
             target_location = convert_san2board(target_san)
             active_pieces = board.get_pieces(player_turn[0], active_piece_type, target_location)
+            print('All pieces that can see the target_square:')
+            print(active_pieces)
+            if move_count == 16:
+                print('Displaying Queen: \n\t\t' + repr(board.get_pieces(player_turn, 'Queen')))
+                print(board.get_pieces(player_turn, 'Bishop'))
         else:
             target_sans = target_san.split()
             target_location = convert_san2board(target_sans[player_turn[1]])
             active_pieces = board.get_pieces(player_turn, active_piece_type, target_location)
             print('Time to implement castling!')
         if not active_pieces:
-            raise InvalidInput('No piece able to execute such a move')
+            try:
+                raise InvalidInput('No piece able to execute such a move')
+            except InvalidInput:
+                print('InvalidInput: No piece able to execute such a move')
+                print(active_pieces)
+                print(active_piece_type)
+                print(target_location)
         elif len(active_pieces) == 1:
+            active_piece, = active_pieces
+        else:
+            active_pieces = disambiguate(active_pieces, disambiguation)
             try:
                 active_piece, = active_pieces
             except ValueError:
                 raise InvalidInput('Disambiguation insufficient: more than one piece able to make this move')
-        else:
-            active_piece = disambiguate(active_pieces, disambiguation)
         # print('active pieces: ' + str(repr(active_pieces)))
         # print('active piece: ' + str(repr(active_piece)))
 
+        print('\nActive Piece pre-move:')
+        print(repr(active_piece))
         board.move(active_piece, target_location)
+        print('Target Square post piece move:')
+        print(repr(board.squares[target_location[0]][target_location[1]]))
         print(board)
 
         move_count += 1
+        print('Move Count: ' + str(move_count))
 
