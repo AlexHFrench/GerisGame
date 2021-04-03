@@ -637,8 +637,43 @@ def disambiguate(candidates, disambiguation):
     return results
 
 
-
-
+def determine_active_piece(board, player_turn, candidate):
+    """ Returns the active piece and target square OR throws exception """
+    if validate_san(candidate):  # if the input SAN notation is of valid format
+        decomposition = active_piece_type, disambiguation, is_capture,\
+            target_san, promotion_type, _, castles = decompose_san(candidate)  # decompose it into it's elements
+        print(decomposition)
+        if not castles:  # for any move other than castles
+            target_location = convert_san2board(target_san)  # determine target location coords
+            # determine which pieces are capable of making the move
+            active_pieces = board.get_pieces(player_turn[0], active_piece_type, target_location)
+            print('All pieces that can see the target_square:')
+            print(active_pieces)
+        else:  # if we are castling
+            target_sans = target_san.split()
+            target_location = convert_san2board(target_sans[player_turn[1]])  # target square depends on colour
+            # determine which pieces are capable of making the move
+            active_pieces = board.get_pieces(player_turn, active_piece_type, target_location)
+            print('Time to implement castling!')
+        if not active_pieces:  # if the board returned 0 pieces fit the criteria set out in the move notation
+            try:
+                raise InvalidInput('No piece able to execute such a move')  # raise an exception
+            except InvalidInput:
+                print('InvalidInput: No piece able to execute such a move')
+                print(active_pieces)
+                print(active_piece_type)
+                print(target_location)
+        elif len(active_pieces) == 1:  # if only 1 piece fits the criteria (colour, type, line_of_sight)
+            active_piece, = active_pieces  # return it
+        else:  # if there are more than 1 pieces  that fit
+            active_pieces = disambiguate(active_pieces, disambiguation)  # utilise disambiguation string
+            try:
+                active_piece, = active_pieces  # there should now only be 1 piece
+            except ValueError:  # if not raise an exception
+                raise InvalidInput('Disambiguation insufficient: more than one piece able to make this move')
+    else:  # in the case of the SAN initially failing to validate
+        raise InvalidInput('Move notation failed to validate')
+    return active_piece, target_location
 
 
 
