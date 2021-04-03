@@ -46,7 +46,7 @@ class Board:
     """
 
     def __init__(self, initial_positions=range(8)):
-        self.temp, self.white_in_check, self.black_in_check = None, False, False
+        self.sideboard, self.white_in_check, self.black_in_check = [], False, False
         colour_generator = white_black()
         self.squares = [[Empty(next(colour_generator), (row, col)) for col in range(8)] for row in range(8)]
         for row in STARTING_ROWS:
@@ -111,6 +111,7 @@ class Board:
             Empty [square] objects are stored in active_piece.temp while checks are made for legality of move
             In case of capture: active_piece.temp = target_piece s.t. target_piece.temp = Empty object
         """
+        print('Starting move procedure..')
         start_row, start_col = active_piece.location
         end_row, end_col = target_location
 
@@ -118,9 +119,10 @@ class Board:
         active_piece.temp = self.squares[end_row][end_col]  # store content of target_location in active_piece's .temp
         self.squares[end_row][end_col] = active_piece  # place active_piece in target_location
 
-        pieces = self.get_pieces()
-        for piece in pieces:
-            piece.look()
+        # pieces = self.get_pieces()
+        # for piece in pieces:
+        #     piece.look()
+        self.update_pieces()
 
         # CHECK FOR CHECKS AGAINST KING OF active_piece
         if active_piece.colour in self.in_check():
@@ -128,10 +130,14 @@ class Board:
             self.squares[end_row][end_col] = active_piece.temp
             active_piece.temp = self.squares[start_row][start_col]
             # Raise an IllegalMove error
-            pass
+            raise IllegalMove(f"{active_piece.colour}'s King is in check!")
         else:
-            # if capture: move target_piece to self.sideboard and active_piece.temp = target_location's Empty object
-            pass
+            if isinstance(active_piece.temp, Piece):  # if capture
+                # move target_piece to self.sideboard and active_piece.temp the target_location's Empty object
+                self.sideboard, active_piece.temp = active_piece.temp, active_piece.temp.temp
+                print('Capture successful!')
+            else:
+                print('Move successful!')
 
     def in_check(self):
         who_in_check = []
@@ -449,7 +455,7 @@ def decompose_san(san):
         take a pre-validated san string and returns:
             (0 - active piece type - STR,
              1 - active piece disambiguation - STR,
-             2 - captures - BOOL,
+             2 - capture - BOOL,
              3 - target square - STR,
              4 - post-promotion piece type - STR,
              5 - check/check-mate claim - STR
@@ -594,19 +600,50 @@ def MAIN_VARIABLES():
     FILES = {'a': 0, 'b': 1, 'c': 2, 'd': 3, 'e': 4, 'f': 5, 'g': 6, 'h': 7}
 
 
-""" MAIN ---------------------------------------------------------------------------------------------------------- MAIN
+""" MAIN CONTROL FLOW -------------------------------------------------------------------------------- MAIN CONTROL FLOW 
 """
 
+
+def disambiguate(candidates, disambiguation):
+    disambiguation.split()
+    start_location = [None, None]
+    for elem in disambiguation:
+        if elem.isnumeric():
+            start_location[0] = int(elem) - 1
+        elif elem.isalpha():
+            start_location[1] = FILES[elem]
+    result = None
+    if
+    for index, piece in enumerate(candidates):
+        piece_location = piece.location
+        if start_location[0]:
+            if start_location[0] == piece_location[0]:
+
+
+
+
+
 if __name__ == '__main__':
-    """ ------------------------------------------------- MAIN BODY ----------------------------------------------------
+    """ ------------------------------------------------- MAIN LOGIC ---------------------------------------------------
     """
 
+    from Exceptions import *
     MAIN_VARIABLES()
 
     board = Board()
     print(board)
 
-    print(board.get_pieces('White', 'Bishop'))
+    # piece = board.squares[6][4]
+    # board.move(piece, (4, 4))
+    #
+    # print(board)
+    # print(repr(board.squares[6][4]))
+    # print(repr(board.squares[4][4]))
+
+
+
+
+
 
 
 

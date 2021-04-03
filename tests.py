@@ -1,6 +1,5 @@
 # test.py
 """ This file houses the suite of tests for main.py classes and functions
-
 """
 
 
@@ -9,22 +8,22 @@
 
 
 def board_initialisations():
-    print(main.Board(main.STANDARD_GAME))
-    print(main.Board(main.KING_AND_PAWN_GAME))
-    print(main.Board(main.MINOR_GAME))
-    print(main.Board(main.MAJOR_GAME))
+    print(Board(STANDARD_GAME))
+    print(Board(KING_AND_PAWN_GAME))
+    print(Board(MINOR_GAME))
+    print(Board(MAJOR_GAME))
 
 
 def san_validation_decomposition(san_test_strings, string_decompositions):
     for i, elem in enumerate(san_test_strings):
         print('\n' + elem + ' :')
         try:
-            assert main.validate_san(elem)
+            assert validate_san(elem)
         except AssertionError:
             print('san FAILED to validate')
         else:
             print('validation: PASSED')
-        decomposition = main.decompose_san(elem)
+        decomposition = decompose_san(elem)
         print(decomposition)
         try:
             assert decomposition == string_decompositions[i]
@@ -39,7 +38,7 @@ def san_validation_decomposition(san_test_strings, string_decompositions):
 def coord_conversions(coords):
     for elem in coords:
         print('\n' + elem[0] + ' :')
-        conversion = main.convert_san2board(elem[0])
+        conversion = convert_san2board(elem[0])
         try:
             assert conversion == elem[1]
         except AssertionError:
@@ -51,7 +50,7 @@ def coord_conversions(coords):
 
     for elem in coords:
         print('\n' + str(elem[1]) + ' :')
-        conversion = main.convertboard2san(elem[1])
+        conversion = convert_board2san(elem[1])
         try:
             assert conversion == elem[0]
         except AssertionError:
@@ -66,7 +65,7 @@ def test_legal(coords):
     for coord in coords:
         print(coord)
         a, b = coord
-        if main.legal(a, b):
+        if legal(a, b):
             print('LEGAL')
         else:
             print('NOT LEGAL!')
@@ -75,7 +74,7 @@ def test_legal(coords):
 def repr_pieces(board):
     for rank in board.squares:
         for piece in rank:
-            if isinstance(piece, main.Piece):
+            if isinstance(piece, Piece):
                 print(repr(piece))
 
 
@@ -110,8 +109,8 @@ def test_all_checks(board):
 if __name__ == '__main__':
     """ Primary imports and initialisation -----------------------------------------------------------------------------
     """
-    import main
-    from main import Board, Piece, King, Queen, Knight, Bishop, Rook, Pawn, MAIN_VARIABLES
+    from Exceptions import *
+    from main import *
     MAIN_VARIABLES()
     """ Local imports and initialisation -----------------------------------------------------------------------------
     """
@@ -153,7 +152,6 @@ if __name__ == '__main__':
     for i in range(1, 45):
         SERIES_OF_LEGAL_MOVES.remove(str(i) + '.')
 
-
     """ Main -----------------------------------------------------------------------------------------------------------
     """
 
@@ -169,7 +167,22 @@ if __name__ == '__main__':
     # board.clear()
     # test_all_checks(board)
 
-    board = Board()
+    print(SERIES_OF_LEGAL_MOVES)
+    player_turn = 'White'
 
+    candidate = SERIES_OF_LEGAL_MOVES[0]
+
+    if validate_san(candidate):
+        active_piece_type, disambiguation, is_capture,\
+            target_san, promotion_type, _, castles = decompose_san(candidate)
+    else:
+        raise InvalidInput('Move notation failed to validate')
+    if not castles:
+        target_location = convert_san2board(target_san)
+        try:
+            active_piece, = board.get_pieces(player_turn, active_piece_type, target_location)
+            print(active_piece)
+        except ValueError:
+            active_pieces = board.get_pieces(player_turn, active_piece_type, target_location)
 
 
