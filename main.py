@@ -26,9 +26,14 @@ NOTE:
         'board indices'; the pair of indices (row, col) indexing a square (board.squares[row][col])
 
 """
+""" --------------------------- IMPORTS
+        """
+
+import re
+from Exceptions import *
+
 """ CLASSES ------------------------------------------------------------------------------------------------------------
 """
-
 
 class Board:
     """ Board():
@@ -159,10 +164,10 @@ class Board:
 
     def in_check(self):
         who_in_check = []
-        for colour in COLOURS:
+        for colour, _ in COLOURS:
             king, = self.get_pieces(colour, 'King')
             target_location = king.location
-            opp_colour, = [x for x in COLOURS if x != colour]
+            opp_colour, = [x for x, y in COLOURS if x != colour]
             checking_pieces = self.get_pieces(opp_colour, line_of_sight=target_location)
             if checking_pieces:
                 who_in_check.append(colour)
@@ -359,7 +364,14 @@ class King(Piece):
     def __init__(self, colour, board, location, has_moved=False):
         super().__init__(colour, board, location, has_moved)
         self.pattern = [(0, 1), (1, 0), (1, 1), (-1, 0), (0, -1), (-1, 1), (1, -1), (-1, -1)]
-        self.steps = 1
+        self.castle_pattern = [(0, 1), (0, -1)]
+        self.steps, self.avail_castles = 1, set()
+
+    def look(self, board):
+        super().look(board)
+        if not self.has_moved:
+            for _, j in self.castle_pattern:
+                new_col = self.location[1] + j
 
 
 class Queen(Piece):
@@ -532,17 +544,13 @@ def MAIN_VARIABLES():
     """ All variables and imports for the main logic of the program
         I separated this into a function to make tests.py function more cleanly
     """
-    """ --------------------------- IMPORTS
-        """
-    global re
-    import re
 
     """ --------------------------- MAIN VARIABLES
     """
     global COLOURS, VALUES, LETTERS, PATTERNS, STEPS, UNICODES, STARTING_ROWS, STANDARD_GAME
     global KING_AND_PAWN_GAME, MINOR_GAME, MAJOR_GAME, FRONT_LINE, BACK_LINE, ROWS, FILES
 
-    COLOURS = ['White', 'Black']
+    COLOURS = (('White', 0), ('Black', 1))
 
     VALUES = {
         'Pawn': 1,

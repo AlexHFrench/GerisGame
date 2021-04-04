@@ -112,6 +112,7 @@ if __name__ == '__main__':
     from Exceptions import *
     from main import *
     MAIN_VARIABLES()
+    COLOURS = (('White', 0), ('Black', 1))
 
     """ Local imports and initialisation -----------------------------------------------------------------------------
     """
@@ -171,12 +172,11 @@ if __name__ == '__main__':
     # test_all_checks(board)
 
     print(SERIES_OF_LEGAL_MOVES)
-    turn_options = (('White', 0), ('Black', 1))
     player_turn = None
     move_count = 2
 
     for candidate in SERIES_OF_LEGAL_MOVES:
-        player_turn = turn_options[move_count % 2]
+        player_turn = COLOURS[move_count % 2]
         print(player_turn[0] + "'s turn!")
 
         print(candidate)
