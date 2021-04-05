@@ -179,15 +179,14 @@ if __name__ == '__main__':
         player_turn = COLOURS[move_count % 2]
         print(player_turn[0] + "'s turn!")
 
-        print(candidate)
+        # print(candidate)
+        active_piece, target_location, castle_direction = determine_active_piece(board, player_turn, candidate)
 
-        active_piece, target_location = determine_active_piece(board, player_turn, candidate)
-
-        print('\nActive Piece pre-move:')
-        print(repr(active_piece))
-        board.move(active_piece, target_location)
-        print('Target Square post piece move:')
-        print(repr(board.squares[target_location[0]][target_location[1]]))
+        # print('\nActive Piece pre-move:')
+        # print(repr(active_piece))
+        board.move(active_piece, target_location, castle_direction)
+        # print('Target Square post piece move:')
+        # print(repr(board.squares[target_location[0]][target_location[1]]))
         print(board)
 
         move_count += 1

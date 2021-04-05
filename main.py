@@ -35,6 +35,7 @@ from Exceptions import *
 """ CLASSES ------------------------------------------------------------------------------------------------------------
 """
 
+
 class Board:
     """ Board():
             ATR:
@@ -112,12 +113,12 @@ class Board:
         pieces = list(pieces)
         return pieces
 
-    def move(self, active_piece, target_location):
+    def move(self, active_piece, target_location, castle_direction=None):
         """ Move active_piece from present location to target_location
             Empty [square] objects are stored in active_piece.temp while checks are made for legality of move
             In case of capture: active_piece.temp = target_piece s.t. target_piece.temp = Empty object
         """
-        print('Starting move procedure..')
+        # print('Starting move procedure..')
         try:
             start_row, start_col = active_piece.location
         except AttributeError:
@@ -126,6 +127,7 @@ class Board:
             print(type(active_piece))
             print(self.squares[7][6])
             print(repr(self.squares[7][6]))
+            raise AttributeError
         end_row, end_col = target_location
 
         self.squares[start_row][start_col] = active_piece.temp  # replace Empty object in active_piece's location
@@ -133,21 +135,17 @@ class Board:
         self.squares[end_row][end_col] = active_piece  # place active_piece in target_location
 
         first_move = False
-        if not active_piece.has_moved:
+        if not active_piece.has_moved:  # remember if this is the pieces first move
             first_move = True
         active_piece.has_moved = True
 
-        # pieces = self.get_pieces()
-        # for piece in pieces:
-        #     piece.look()
-        print('UPDATING PIECES before check check!')
-        self.update_pieces()
+        self.update_pieces()  # update pieces after moving active_piece
 
         # CHECK FOR CHECKS AGAINST KING OF active_piece
         if active_piece.colour in self.in_check():
             # Player either moved into check or ignored an already extant check on the board
             self.squares[end_row][end_col] = active_piece.temp
-            active_piece.temp = self.squares[start_row][start_col]
+            active_piece.temp = self.squares[start_row][start_col]  # undo previous maneuver
             print('UPDATING PIECES due to check found!')
             if first_move:
                 active_piece.has_moved = False
@@ -158,9 +156,18 @@ class Board:
             if isinstance(active_piece.temp, Piece):  # if capture
                 # move target_piece to self.sideboard and active_piece.temp the target_location's Empty object
                 self.sideboard, active_piece.temp = active_piece.temp, active_piece.temp.temp
-                print('Capture successful!')
+                # print('Capture successful!')
             else:
-                print('Move successful!')
+                # print('Move successful!')
+                if castle_direction:  # if we're castling
+                    if castle_direction == 'Queen':  # check which direction
+                        start_col, end_col = 0, 3
+                    else:
+                        start_col, end_col = 7, 5
+                    active_piece = self.squares[start_row][start_col]  # select the relevant Rook
+                    self.squares[start_row][start_col] = active_piece.temp  # this move code is the same as above
+                    active_piece.temp = self.squares[end_row][end_col]
+                    self.squares[end_row][end_col] = active_piece
 
     def in_check(self):
         who_in_check = []
@@ -175,7 +182,7 @@ class Board:
 
 
 class Empty:
-    """ Empty square, place holder object. Has a colour."""
+    """ Empty square, place holder object. Has colour and location."""
 
     def __init__(self, colour, location):
         self.colour = colour
@@ -300,12 +307,12 @@ class Pawn(Piece):
             new_row = self.location[0] + i * self.direction
             new_col = self.location[1] + j * self.direction
             if not legal(new_row, new_col):
-                break
+                continue
             square = board.squares[new_row][new_col]
             if isinstance(square, Piece) and square.colour != self.colour:
                 self.avail_captures.add((new_row, new_col))
             else:
-                break
+                continue
 
 
 class Rook(Piece):
@@ -366,12 +373,27 @@ class King(Piece):
         self.pattern = [(0, 1), (1, 0), (1, 1), (-1, 0), (0, -1), (-1, 1), (1, -1), (-1, -1)]
         self.castle_pattern = [(0, 1), (0, -1)]
         self.steps, self.avail_castles = 1, set()
+        colours = {'White', 'Black'}
+        self.opp_colour, = colours - {self.colour}
 
     def look(self, board):
         super().look(board)
-        if not self.has_moved:
-            for _, j in self.castle_pattern:
+        if not self.has_moved and self.colour not in board.in_check():  # if not moved and not in check
+            row = self.location[0]
+            for _, j in self.castle_pattern:  # in both directions along the rank
                 new_col = self.location[1] + j
+                for _ in range(4):
+                    square = board.squares[row][new_col]  # check the next square
+                    if isinstance(square, Empty):  # if it's empty and not in visible to opponent
+                        if board.get_pieces(self.opp_colour, line_of_sight=square.location) is not None:
+                            new_col += j
+                            continue
+                    elif isinstance(square, Rook):  # if it's a rook and it's not moved
+                        if not square.has_moved:
+                            castle_location = (row, self.location[1] + j*2)
+                            self.avail_moves.add(castle_location)  # castling is legal
+                    else:
+                        break
 
 
 class Queen(Piece):
@@ -458,7 +480,7 @@ def convert_board2san(coord):
 
 
 def validate_san(san):
-    """ validates a string is compliant to the notation conventions of SAN >>
+    """ validates a string, is compliant to the notation conventions of SAN >>
         (https://en.wikipedia.org/wiki/Algebraic_notation_(chess))
         returns: MatchObject OR None
 
@@ -472,7 +494,7 @@ def validate_san(san):
             eg: Rdf8, R1a3, Qh4e1
         promotion: trailing notation of piece being promoted to - eg: e8Q, f8N
         none-san valid strings: 'draw', 'resign', 'save', 'quit'
-        castling: 0-0, 0-0-0 for king and queen side respectively
+        castling: 0-0, 0-0-0 for king and queen side respectively, note those are ZEROs
         check: trailing '+'
         checkmate: trailing '#'
         end of game: 1-0, 0-1, ½-½ for white victory, black victory and draw respectively
@@ -550,7 +572,7 @@ def MAIN_VARIABLES():
     global COLOURS, VALUES, LETTERS, PATTERNS, STEPS, UNICODES, STARTING_ROWS, STANDARD_GAME
     global KING_AND_PAWN_GAME, MINOR_GAME, MAJOR_GAME, FRONT_LINE, BACK_LINE, ROWS, FILES
 
-    COLOURS = (('White', 0), ('Black', 1))
+    COLOURS = [('White', 0), ('Black', 1)]
 
     VALUES = {
         'Pawn': 1,
@@ -649,19 +671,21 @@ def determine_active_piece(board, player_turn, candidate):
     """ Returns the active piece and target square OR throws exception """
     if validate_san(candidate):  # if the input SAN notation is of valid format
         decomposition = active_piece_type, disambiguation, is_capture,\
-            target_san, promotion_type, _, castles = decompose_san(candidate)  # decompose it into it's elements
-        print(decomposition)
-        if not castles:  # for any move other than castles
+            target_san, promotion_type, _, castle_direction = decompose_san(candidate) # decompose it into it's elements
+        # print(decomposition)
+        if not castle_direction:  # for any move other than castles
             target_location = convert_san2board(target_san)  # determine target location coords
             # determine which pieces are capable of making the move
             active_pieces = board.get_pieces(player_turn[0], active_piece_type, target_location)
-            print('All pieces that can see the target_square:')
-            print(active_pieces)
+            # print('All pieces that can see the target_square:')
+            # print(active_pieces)
         else:  # if we are castling
             target_sans = target_san.split()
             target_location = convert_san2board(target_sans[player_turn[1]])  # target square depends on colour
-            # determine which pieces are capable of making the move
-            active_pieces = board.get_pieces(player_turn, active_piece_type, target_location)
+            try:  # determine which pieces are capable of making the move
+                active_pieces = board.get_pieces(player_turn[0], active_piece_type, target_location)
+            except ValueError:  # if none raise an exception
+                raise InvalidInput('Such a castling move is not legal at this time!')
             print('Time to implement castling!')
         if not active_pieces:  # if the board returned 0 pieces fit the criteria set out in the move notation
             try:
@@ -681,7 +705,7 @@ def determine_active_piece(board, player_turn, candidate):
                 raise InvalidInput('Disambiguation insufficient: more than one piece able to make this move')
     else:  # in the case of the SAN initially failing to validate
         raise InvalidInput('Move notation failed to validate')
-    return active_piece, target_location
+    return active_piece, target_location, castle_direction
 
 
 
@@ -697,14 +721,13 @@ if __name__ == '__main__':
     board = Board()
     print(board)
 
-    # piece = board.squares[6][4]
-    # board.move(piece, (4, 4))
-    #
-    # print(board)
+    board.squares[5][3] = Pawn('Black', board, (5, 3), True)
+    print(board)
+
+    board.update_pieces()
+    print(repr(board.squares[5][3]))
+    print(repr(board.squares[6][2]))
     print(repr(board.squares[6][4]))
-    # print(repr(board.squares[4][4]))
-
-
 
 
 
