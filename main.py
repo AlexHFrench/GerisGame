@@ -69,7 +69,7 @@ class Board:
                 if row == 7 and col in initial_positions:
                     type_ = BACK_LINE[col]
                     self.squares[row][col] = eval(type_)('White', self, (row, col))
-        self.update_pieces()
+        self.update_pieces('Black')
 
     def __str__(self, ):
         """ return a printable, human-readable string representation of the board in its current state
@@ -92,14 +92,22 @@ class Board:
         colour_generator = white_black()
         self.squares = [[Empty(next(colour_generator), (row, col)) for col in range(8)] for row in range(8)]
 
-    def update_pieces(self):
+    def update_pieces(self, opp_colour):
+        kings = list()
         for row, col in ((x, y) for x in range(8) for y in range(8)):  # give pieces vision of the board
             square = self.squares[row][col]
             if isinstance(square, Piece):
                 square.location = (row, col)
+                if isinstance(square, King):
+                    kings.append(square)
                 square.look(self)
+        # this handles niche case where two kings are "fighting over" a single pawn
+        for index, king in enumerate(kings):
+            if king.colour == opp_colour:
+                king.look(self)
+                kings[abs(index - 1)].look(self)
 
-    def get_pieces(self, colour=None, type_=None, line_of_sight=None):
+    def get_pieces(self, colour=None, type_=None, move_vision=None, reach_of_check=None):
         """ Returns all pieces on the board which match the given criteria. """
         pieces = flatten(self.squares)
         pieces = filter(lambda x: isinstance(x, Piece), pieces)
@@ -107,9 +115,11 @@ class Board:
             pieces = filter(lambda x: x.colour == colour, pieces)
         if type_:
             pieces = filter(lambda x: isinstance(x, eval(type_)), pieces)
-        if line_of_sight:
-            pieces = filter(lambda x: line_of_sight in x.avail_moves
-                            or line_of_sight in x.avail_captures, pieces)
+        if move_vision:
+            pieces = filter(lambda x: move_vision in x.avail_moves
+                            or move_vision in x.avail_captures, pieces)
+        elif reach_of_check:
+            pieces = filter(lambda x: move_through_check(x, reach_of_check), pieces)
         pieces = list(pieces)
         return pieces
 
@@ -135,11 +145,11 @@ class Board:
         self.squares[end_row][end_col] = active_piece  # place active_piece in target_location
 
         first_move = False
-        if not active_piece.has_moved:  # remember if this is the pieces first move
+        if not active_piece.has_moved:  # remember if this is the piece's first move
             first_move = True
         active_piece.has_moved = True
 
-        self.update_pieces()  # update pieces after moving active_piece
+        self.update_pieces(active_piece.opp_colour)  # update pieces after moving active_piece
 
         # CHECK FOR CHECKS AGAINST KING OF active_piece
         if active_piece.colour in self.in_check():
@@ -149,7 +159,7 @@ class Board:
             print('UPDATING PIECES due to check found!')
             if first_move:
                 active_piece.has_moved = False
-            self.update_pieces()
+            self.update_pieces(active_piece.opp_colour)
             # Raise an IllegalMove error
             raise IllegalMove(f"{active_piece.colour}'s King is in check!")
         else:
@@ -171,11 +181,11 @@ class Board:
 
     def in_check(self):
         who_in_check = []
-        for colour, _ in COLOURS:
+        for colour in COLOURS:
             king, = self.get_pieces(colour, 'King')
             target_location = king.location
-            opp_colour, = [x for x, y in COLOURS if x != colour]
-            checking_pieces = self.get_pieces(opp_colour, line_of_sight=target_location)
+            opp_colour, = set(COLOURS) - {colour}
+            checking_pieces = self.get_pieces(opp_colour, move_vision=target_location)
             if checking_pieces:
                 who_in_check.append(colour)
         return who_in_check
@@ -218,6 +228,7 @@ class Piece:
         self.avail_moves, self.avail_captures, self.supporting = set(), set(), set()  # piece vision
         self.pattern, self.steps = None, None  # pattern of movement allowed in the rules
         self.colour = colour
+        self.opp_colour, = set(COLOURS) - {self.colour}
         self.location = location
         self.temp = board.squares[location[0]][location[1]]  # important during piece capture and elsewhere
         self.has_moved = has_moved  # important for castling, double-step pawn moves and captures en-passant
@@ -253,10 +264,16 @@ class Piece:
                     break
                 square = board.squares[new_row][new_col]
                 if isinstance(square, Empty):
+                    if isinstance(self, King):  # Kings cannot move into check >>
+                        if board.get_pieces(self.opp_colour, reach_of_check=(new_row, new_col)):
+                            break
                     self.avail_moves.add((new_row, new_col))
                     new_row += i
                     new_col += j
                 elif square.colour != self.colour:
+                    if isinstance(self, King):  # Kings cannot move into check >>
+                        if board.get_pieces(self.opp_colour, reach_of_check=(new_row, new_col)):
+                            break
                     self.avail_captures.add((new_row, new_col))
                     break
                 else:
@@ -280,39 +297,48 @@ class Pawn(Piece):
 
     def __init__(self, colour, board, location, has_moved=False):
         super().__init__(colour, board, location, has_moved)
-        self.pattern = [(1, 1), (1, -1)]
-        self.steps = 1
+        self.pattern, self.steps, self.capture_vision = [(1, 1), (1, -1)], 1, None
         if colour == 'White':
             self.direction = -1  # used to orient the piece on the board; pawns are not omni-directional
         else:
             self.direction = 1
 
+    def __repr__(self):
+        capture_vision = [convert_board2san(x) for x in self.capture_vision]
+        first = super().__repr__()
+        return f'{first}\naggro vision: {str(capture_vision)}'
+
     def look(self, board):
         """Piece populates self.avail_moves and self.avail_captures with legal board indices."""
-        self.avail_moves, self.avail_captures, self.supporting = set(), set(), set()
+        self.avail_moves, self.avail_captures, self.supporting, self.capture_vision = set(), set(), set(), set()
         new_row, _ = row, col = self.location
         if not self.has_moved:
             self.steps = 2
-        # Look for places the pawn can legally move
+        # Examine squares the Pawn can non-aggressively move to
         for _ in range(self.steps):
             new_row += self.direction
+            if not legal(new_row, col):  # this means this pawn is promoting
+                continue
             square = board.squares[new_row][col]
             if isinstance(square, Empty):
                 self.avail_moves.add((new_row, col))
             else:
                 break
         self.steps = 1
-        # Look for pieces the pawn can legally capture
+        # Examine squares the Pawn can aggressively move to
         for i, j in self.pattern:
             new_row = self.location[0] + i * self.direction
             new_col = self.location[1] + j * self.direction
-            if not legal(new_row, new_col):
+            if not legal(new_row, new_col):  # if off the board ignore them
                 continue
             square = board.squares[new_row][new_col]
-            if isinstance(square, Piece) and square.colour != self.colour:
-                self.avail_captures.add((new_row, new_col))
-            else:
-                continue
+            if isinstance(square, Piece):  # if there is a piece there
+                if square.colour != self.colour:  # and it an opposition piece ..
+                    self.avail_captures.add((new_row, new_col))  # note it down
+                else:  # if it's ours
+                    self.supporting.add((new_row, new_col))  # note it down
+            else:  # if it is an empty square, note it down
+                self.capture_vision.add((new_row, new_col))  # this is for move-through-check calculations
 
 
 class Rook(Piece):
@@ -373,8 +399,7 @@ class King(Piece):
         self.pattern = [(0, 1), (1, 0), (1, 1), (-1, 0), (0, -1), (-1, 1), (1, -1), (-1, -1)]
         self.castle_pattern = [(0, 1), (0, -1)]
         self.steps, self.avail_castles = 1, set()
-        colours = {'White', 'Black'}
-        self.opp_colour, = colours - {self.colour}
+        self.opp_colour, = set(COLOURS) - {self.colour}
 
     def look(self, board):
         super().look(board)
@@ -383,15 +408,18 @@ class King(Piece):
             for _, j in self.castle_pattern:  # in both directions along the rank
                 new_col = self.location[1] + j
                 for _ in range(4):
-                    square = board.squares[row][new_col]  # check the next square
-                    if isinstance(square, Empty):  # if it's empty and not in visible to opponent
-                        if board.get_pieces(self.opp_colour, line_of_sight=square.location) is not None:
-                            new_col += j
-                            continue
-                    elif isinstance(square, Rook):  # if it's a rook and it's not moved
-                        if not square.has_moved:
-                            castle_location = (row, self.location[1] + j*2)
-                            self.avail_moves.add(castle_location)  # castling is legal
+                    if legal(row, new_col):  # if the next square is on the board
+                        square = board.squares[row][new_col]  # check it
+                        if isinstance(square, Empty):  # if it's empty and not visible to opponent
+                            if board.get_pieces(self.opp_colour, reach_of_check=square.location) is not None:
+                                new_col += j
+                                continue
+                        elif isinstance(square, Rook):  # if it's a rook and it's not moved
+                            if not square.has_moved:
+                                castle_location = (row, self.location[1] + j*2)
+                                self.avail_moves.add(castle_location)  # castling is legal
+                        else:
+                            break
                     else:
                         break
 
@@ -409,6 +437,67 @@ class Queen(Piece):
         super().__init__(colour, board, location, has_moved)
         self.pattern = [(0, 1), (1, 0), (1, 1), (-1, 0), (0, -1), (-1, 1), (1, -1), (-1, -1)]
         self.steps = 7
+
+
+class Agent:
+    """ The Base class for all game-playing-agents: human, random, engine, etc. """
+    def __init__(self, name, colour):
+        self.name = name
+        self.colour = colour
+
+    def __str__(self):
+        return f'{self.name}\n'
+
+    def __repr__(self):
+        return f'Name:        {self.name}\n' \
+               f'Colour:      {self.colour}\n' \
+               f'Agent_type:  {self.__class__.__name__}\n\n'
+
+
+class Human(Agent):
+    """ The human-player class - Manages player actions. """
+
+    def __init__(self, name, colour):
+        super().__init__(name, colour)
+
+    def get_input(self, board):
+        """ Prompts user for their command - Returns the string.
+            Ensures it is a viable command or of correct SAN syntax before returning.
+        """
+        while True:
+            print('<cmd> for a list of commands.')
+            result = input('                   Your move:  ')
+            print('\n')
+            if validate_san(result):
+                return result
+            elif result.isalpha():
+                result = result.lower()
+                if result == 'cmd':
+                    in_game_commands()
+                if result == 'resign':
+                    not_implemented('resign')
+                if result == 'save':
+                    not_implemented('save')
+                if result == 'close':
+                    exit_program()
+
+
+class Random(Agent):
+    """ The random-action-player class - Manages random-action-player decisions and actions. """
+
+    def __init__(self, name, colour):
+        super().__init__(name, colour)
+
+    pass
+
+
+class Engine(Agent):
+    """ The engine class - Manages engine decisions and actions. """
+
+    def __init__(self, name, colour):
+        super().__init__(name, colour)
+
+    pass
 
 
 """ IO -----------------------------------------------------------------------------------------------------------------
@@ -499,7 +588,7 @@ def validate_san(san):
         checkmate: trailing '#'
         end of game: 1-0, 0-1, ½-½ for white victory, black victory and draw respectively
     """
-    result = re.search('[RNBQK]?[a-h]?[1-8]?[x]?[a-h][1-8][RNBQ]?[+#]?|0-0-?0?', san)
+    result = re.search('[RNBQK]?[a-h]?[1-8]?[x]?[a-h][1-8][RNBQ]?[+#]?|0-0-?0?|O-O-?O?', san)
     return result
 
 
@@ -516,10 +605,10 @@ def decompose_san(san):
     """
     result = ['', '', False, '', '', '', '']
 
-    if san == '0-0':
+    if san == '0-0' or san == 'O-O':
         result = ['King', '', False, 'g1 g8', '', '', 'King']
         return tuple(result)
-    if san == '0-0-0':
+    if san == '0-0-0' or san == 'O-O-O':
         result = ['King', '', False, 'c1 c8', '', '', 'Queen']
         return tuple(result)
     if san.endswith('#'):
@@ -571,8 +660,9 @@ def MAIN_VARIABLES():
     """
     global COLOURS, VALUES, LETTERS, PATTERNS, STEPS, UNICODES, STARTING_ROWS, STANDARD_GAME
     global KING_AND_PAWN_GAME, MINOR_GAME, MAJOR_GAME, FRONT_LINE, BACK_LINE, ROWS, FILES
+    global IN_GAME_COMMANDS
 
-    COLOURS = [('White', 0), ('Black', 1)]
+    COLOURS = ('White', 'Black')
 
     VALUES = {
         'Pawn': 1,
@@ -648,9 +738,144 @@ def MAIN_VARIABLES():
     ROWS = (1, 2, 3, 4, 5, 6, 7, 8)
     FILES = {'a': 0, 'b': 1, 'c': 2, 'd': 3, 'e': 4, 'f': 5, 'g': 6, 'h': 7}
 
+    # Non-move commands player can enter during a game
+    IN_GAME_COMMANDS = ['resign', 'save', 'close']
 
-""" MAIN CONTROL FLOW -------------------------------------------------------------------------------- MAIN CONTROL FLOW 
+
+""" MENU CONTROL FLOW -------------------------------------------------------------------------------- MAIN CONTROL FLOW 
 """
+
+
+def player_wants_game():
+    """ Determines if player wants to play a game, see more advanced game options or quit the program """
+    while True:
+        print('Do you want to play a game? <yes/no>')
+        print('Advanced options <adv>')
+        result = input('    :  ').lower()
+
+        if result == 'yes':
+            return 1
+        elif result == 'no':
+            exit_program()
+        elif result == 'adv':
+            return advanced_game_options()
+
+
+def advanced_game_options():
+    """ Gives player options about the kind of game to set up """
+    while True:
+        print('Play which game?')
+        print('    1 - Standard game')
+        print('    2 - King and Pawn game')
+        print('    3 - Minor piece game')
+        print('    4 - Major piece game')
+        print('    help - <help>')
+        print('    exit - <quit/exit/no>')
+        result = input('    :  ')
+        print('\n')
+
+        if result.isnumeric():
+            if result in ('1', '2', '3', '4'):
+                return int(result)
+        elif result.lower() == 'help':
+            print('    Standard game      - Normal pieces on board')
+            print('    King and Pawn game - Both sides have only King and Pawns')
+            print('    Minor piece game   - Both side have only King, Pawns and Bishops and Knights')
+            print('    Major piece game   - Both side have only King, Pawns and Queen and Rooks')
+            print('\n')
+            pass
+        elif result.lower() in ('quit', 'exit', 'no'):
+            exit_program()
+
+
+def set_board(result):
+    """ Returns a board, initialised and ready for play """
+    games = (STANDARD_GAME, KING_AND_PAWN_GAME, MINOR_GAME, MAJOR_GAME)
+
+    board = Board(games[result - 1])
+    return board
+
+
+def get_agent_type(player):
+    """ Prompts user for info as to the type of agent to be created """
+    print('There are three kinds of Agents you can initialise.')
+    print('    1 - <Human> - This would be a totally manually operated agent.')
+    print('                You are playing the game yourself.')
+    print('    2 - <Random> - This is an agent who simply makes totally random moves.')
+    print('                 They select from the set of all legal moves.')
+    print('    3 - <Engine> - This is an agent which selects moves on the basis of some')
+    print('                 pre-programmed algorithm.')
+    print(f'\nWhich type of agent should {player} be?')
+
+    while True:
+        result = input('        :  ')
+        if result.isalpha():
+            result = result.lower()
+            if result.lower() == 'human':
+                agent_type = result.capitalize()
+                break
+            elif result.lower() == 'random':
+                agent_type = result.capitalize()
+                break
+            elif result.lower() == 'engine':
+                agent_type = result.capitalize()
+                break
+        elif result.isnumeric():
+            if result == '1':
+                agent_type = 'Human'
+                break
+            elif result == '2':
+                agent_type = 'Random'
+                break
+            elif result == '3':
+                agent_type = 'Engine'
+                break
+
+    agent_name = player
+    print(f'And their name? Typing nothing will use the default name: {player}')
+    while True:
+        result = input('        :  ')
+        if result == '':
+            break
+        elif result.isalnum():
+            agent_name = result
+            break
+        else:
+            print('\n        Can only include letters or numbers.\n')
+
+    return agent_type, agent_name
+
+
+def in_game_commands():
+    print('    <resign> the game')
+    print('    <save> the game for later continuation from current position')
+    print('    <close> the program\n')
+
+
+""" GAME CONTROL FLOW -------------------------------------------------------------------------------- MAIN CONTROL FLOW 
+"""
+
+
+def assign_players():
+    """ Takes operator through process of initialising the two agents involved
+        in the game - Returns two Agent() instances as player1 & player2
+    """
+    print('This is the Agent Creation Wizard.')
+    print('We will take you through initialising the Agents who will be playing the game.')
+    print('Nominally Player1 (white) and Player2 (black) you have the option of crafting different names at this time.')
+    print("Let's start!\n\n")
+
+    player1, player2, gen_colour = 'Player1', 'Player2', white_black()
+
+    # Agent 1 - white
+    agent_type, agent_name = get_agent_type(player1)
+    player1 = eval(agent_type)(agent_name, next(gen_colour))
+
+    # Agent 2 - black
+    agent_type, agent_name = get_agent_type(player2)
+    player2 = eval(agent_type)(agent_name, next(gen_colour))
+
+    return player1, player2
 
 
 def disambiguate(candidates, disambiguation):
@@ -667,35 +892,39 @@ def disambiguate(candidates, disambiguation):
     return results
 
 
-def determine_active_piece(board, player_turn, candidate):
-    """ Returns the active piece and target square OR throws exception """
+def determine_active_piece(board, colour, candidate):
+    """ Returns the active piece and target square OR throws exception.
+            -> active_piece, target_location, castle_direction
+    """
     if validate_san(candidate):  # if the input SAN notation is of valid format
         decomposition = active_piece_type, disambiguation, is_capture,\
-            target_san, promotion_type, _, castle_direction = decompose_san(candidate) # decompose it into it's elements
+            target_san, promotion_type, _, castle_direction = decompose_san(candidate)  # decompose into elements
         # print(decomposition)
         if not castle_direction:  # for any move other than castles
             target_location = convert_san2board(target_san)  # determine target location coords
             # determine which pieces are capable of making the move
-            active_pieces = board.get_pieces(player_turn[0], active_piece_type, target_location)
-            # print('All pieces that can see the target_square:')
-            # print(active_pieces)
+            active_pieces = board.get_pieces(colour, active_piece_type, target_location)
         else:  # if we are castling
             target_sans = target_san.split()
-            target_location = convert_san2board(target_sans[player_turn[1]])  # target square depends on colour
+            if colour == 'White':
+                index = 0
+            else:
+                index = 1
+            target_location = convert_san2board(target_sans[index])  # target square depends on colour
             try:  # determine which pieces are capable of making the move
-                active_pieces = board.get_pieces(player_turn[0], active_piece_type, target_location)
-            except ValueError:  # if none raise an exception
-                raise InvalidInput('Such a castling move is not legal at this time!')
+                active_pieces = board.get_pieces(colour, active_piece_type, target_location)
+            except ValueError('Such a castling move is not legal at this time!'):  # if none raise an exception
+                raise
             print('Time to implement castling!')
-        if not active_pieces:  # if the board returned 0 pieces fit the criteria set out in the move notation
+        if not active_pieces:  # if the board returned 0 pieces that match the move notation
+            print(active_pieces)
+            print(active_piece_type)
+            print(target_location)
             try:
                 raise InvalidInput('No piece able to execute such a move')  # raise an exception
             except InvalidInput:
-                print('InvalidInput: No piece able to execute such a move')
-                print(active_pieces)
-                print(active_piece_type)
-                print(target_location)
-        elif len(active_pieces) == 1:  # if only 1 piece fits the criteria (colour, type, line_of_sight)
+                raise
+        elif len(active_pieces) == 1:  # if only 1 piece fits the criteria (colour, type, move_vision)
             active_piece, = active_pieces  # return it
         else:  # if there are more than 1 pieces  that fit
             active_pieces = disambiguate(active_pieces, disambiguation)  # utilise disambiguation string
@@ -708,7 +937,84 @@ def determine_active_piece(board, player_turn, candidate):
     return active_piece, target_location, castle_direction
 
 
+def move_through_check(piece, location):
+    """ Function specifically for use by Board.get_pieces() in the case of move-into-check calculations """
+    if isinstance(piece, Pawn):
+        return location in piece.capture_vision
+    else:
+        return location in piece.avail_moves or location in piece.supporting
 
+
+""" MAIN CONTROL FLOW -------------------------------------------------------------------------------- MAIN CONTROL FLOW 
+"""
+
+
+def agent_turn(board, player, turn_no):
+    pass
+
+
+def main():
+    """ Main control logic of the program
+        Starts by opening up a menu suite for the player to select a game to play
+        Then starts up a game
+    """
+    result = player_wants_game()
+
+    board = set_board(result)
+    print(board)
+
+
+def lets_play(board):
+    """ Main game control logic """
+
+    player1, player2 = assign_players()
+
+    # initialise game
+    turn_no, game_on = 1, True
+
+    # start game loop
+    while game_on:
+
+        print(f"{player1}'s turn:")
+        while True:
+            result = player1.get_input(board)  # get agent move/input - contains a close program option
+            try:
+                # run move through legal moves
+                active_piece, target_location, castle_direction = determine_active_piece(board, player1.colour, result)
+                break
+            except InvalidInput as II:  # if it flags inform the agent and re-ask for a move
+                print(f'Apologies, {result} failed to identify a unique, legal move.')
+                print(f'{II}')
+
+        # execute move on board
+        board.move(active_piece, target_location, castle_direction)
+
+        print(f"{player2}'s turn:")
+        while True:
+            result = player2.get_input(board)  # get agent move/input - contains a close program option
+            try:
+                # run move through legal moves
+                active_piece, target_location, castle_direction = determine_active_piece(board, player2.colour, result)
+                break
+            except InvalidInput as II:  # if it flags inform the agent and re-ask for a move
+                print(f'Apologies, {result} failed to identify a unique, legal move.')
+                print(f'{II}')
+
+        # execute move on board
+        board.move(active_piece, target_location, castle_direction)
+
+        turn_no += 1
+
+
+def exit_program():
+    """ Exits the program """
+    print('Okay! See you soon :)')
+    sys.exit()
+
+
+def not_implemented(cmd):
+    print(f'<{cmd}> not implemented at this time.')
+    exit_program()
 
 
 if __name__ == '__main__':
@@ -716,24 +1022,20 @@ if __name__ == '__main__':
     """
 
     from Exceptions import *
+    import sys
     MAIN_VARIABLES()
+
+    # main()
 
     board = Board()
     print(board)
 
-    board.squares[5][3] = Pawn('Black', board, (5, 3), True)
-    print(board)
+    agent = Human('Alex', 'White')
+    print(agent)
+    print(repr(agent))
 
-    board.update_pieces()
-    print(repr(board.squares[5][3]))
-    print(repr(board.squares[6][2]))
-    print(repr(board.squares[6][4]))
-
-
-
-
-
-
+    result = agent.get_input(board)
+    print(result)
 
 
 
