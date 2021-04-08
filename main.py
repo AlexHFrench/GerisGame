@@ -32,7 +32,7 @@ NOTE:
 import re
 from Exceptions import *
 
-""" CLASSES ------------------------------------------------------------------------------------------------------------
+""" BOARD & PIECES --------------------------------------------------------------------------------------------- CLASSES
 """
 
 
@@ -71,7 +71,7 @@ class Board:
                     self.squares[row][col] = eval(type_)('White', self, (row, col))
         self.update_pieces('Black')
 
-    def __str__(self, ):
+    def __str__(self):
         """ return a printable, human-readable string representation of the board in its current state
         """
         output = ''
@@ -83,7 +83,7 @@ class Board:
         output += '   '
         for file in FILES:
             output += file + ' ' * 6
-        output += '\n' * 2
+        output += '\n'
         return output
 
     def clear(self):
@@ -92,20 +92,25 @@ class Board:
         colour_generator = white_black()
         self.squares = [[Empty(next(colour_generator), (row, col)) for col in range(8)] for row in range(8)]
 
-    def update_pieces(self, opp_colour):
+    def update_pieces(self, colour):
+        """ This updates each piece s.r.t. their legal moves given current board state.
+            Kings are updated last and the King whose move it is is updated last.
+            colour is the colour of the King whose turn it is currently.
+        """
         kings = list()
         for row, col in ((x, y) for x in range(8) for y in range(8)):  # give pieces vision of the board
             square = self.squares[row][col]
-            if isinstance(square, Piece):
+            if isinstance(square, Piece):  # For each piece
                 square.location = (row, col)
-                if isinstance(square, King):
+                if isinstance(square, King):  # unless it's a king
                     kings.append(square)
-                square.look(self)
+                    continue
+                square.look(self)  # have it look at the board
         # this handles niche case where two kings are "fighting over" a single pawn
         for index, king in enumerate(kings):
-            if king.colour == opp_colour:
-                king.look(self)
-                kings[abs(index - 1)].look(self)
+            if king.colour == colour:
+                kings[abs(index - 1)].look(self)  # first update the non-playing-player's King
+                king.look(self)  # then the King whose turn it is
 
     def get_pieces(self, colour=None, type_=None, move_vision=None, reach_of_check=None):
         """ Returns all pieces on the board which match the given criteria. """
@@ -152,7 +157,8 @@ class Board:
         self.update_pieces(active_piece.opp_colour)  # update pieces after moving active_piece
 
         # CHECK FOR CHECKS AGAINST KING OF active_piece
-        if active_piece.colour in self.in_check():
+        checks, _ = self.in_check()
+        if active_piece.colour in checks:
             # Player either moved into check or ignored an already extant check on the board
             self.squares[end_row][end_col] = active_piece.temp
             active_piece.temp = self.squares[start_row][start_col]  # undo previous maneuver
@@ -180,15 +186,31 @@ class Board:
                     self.squares[end_row][end_col] = active_piece
 
     def in_check(self):
-        who_in_check = []
-        for colour in COLOURS:
-            king, = self.get_pieces(colour, 'King')
+        checks, checking_pieces = [], []
+        for colour in COLOURS:  # For each colour
+            king, = self.get_pieces(colour, 'King')  # Find their King
             target_location = king.location
-            opp_colour, = set(COLOURS) - {colour}
-            checking_pieces = self.get_pieces(opp_colour, move_vision=target_location)
-            if checking_pieces:
-                who_in_check.append(colour)
-        return who_in_check
+            # List opposition pieces with vision of the King
+            any_checking_pieces = self.get_pieces(king.opp_colour, reach_of_check=target_location)
+            for piece in any_checking_pieces:
+                checks.append(colour)
+            checking_pieces.extend(any_checking_pieces)
+        return checks, checking_pieces
+
+    # def is_checkmate(self):
+    #     checks, checking_pieces = self.in_check()
+    #     number = len(checks)
+    #     if number > 1:
+    #         # double check
+    #     elif number:
+    #         # single check
+    #
+    #     else:
+    #         #no checks
+    #         pass
+
+
+
 
 
 class Empty:
@@ -403,7 +425,8 @@ class King(Piece):
 
     def look(self, board):
         super().look(board)
-        if not self.has_moved and self.colour not in board.in_check():  # if not moved and not in check
+        checks, _ = board.in_check()
+        if not self.has_moved and self.colour not in checks:  # if not moved and not in check
             row = self.location[0]
             for _, j in self.castle_pattern:  # in both directions along the rank
                 new_col = self.location[1] + j
@@ -439,6 +462,10 @@ class Queen(Piece):
         self.steps = 7
 
 
+""" AGENTS ----------------------------------------------------------------------------------------------------- CLASSES
+"""
+
+
 class Agent:
     """ The Base class for all game-playing-agents: human, random, engine, etc. """
     def __init__(self, name, colour):
@@ -446,7 +473,7 @@ class Agent:
         self.colour = colour
 
     def __str__(self):
-        return f'{self.name}\n'
+        return f'{self.name}'
 
     def __repr__(self):
         return f'Name:        {self.name}\n' \
@@ -498,17 +525,6 @@ class Engine(Agent):
         super().__init__(name, colour)
 
     pass
-
-
-""" IO -----------------------------------------------------------------------------------------------------------------
-"""
-
-
-def get_player_move():
-    """ returns a move selected by the player in SAN
-    """
-    player_input = input('What is your move?\n\t:\t')
-    return player_input
 
 
 """ UTILS --------------------------------------------------------------------------------------------------------------
@@ -750,7 +766,7 @@ def player_wants_game():
     """ Determines if player wants to play a game, see more advanced game options or quit the program """
     while True:
         print('Do you want to play a game? <yes/no>')
-        print('Advanced options <adv>')
+        print('Advanced options             <adv>')
         result = input('    :  ').lower()
 
         if result == 'yes':
@@ -860,9 +876,9 @@ def assign_players():
     """ Takes operator through process of initialising the two agents involved
         in the game - Returns two Agent() instances as player1 & player2
     """
-    print('This is the Agent Creation Wizard.')
-    print('We will take you through initialising the Agents who will be playing the game.')
-    print('Nominally Player1 (white) and Player2 (black) you have the option of crafting different names at this time.')
+    print('This is the Agent Creation Wizard.\n')
+    print("We'll take you through the process of initialising the Agents who will be playing the game.")
+    print('Player1 (white) and Player2 (black).')
     print("Let's start!\n\n")
 
     player1, player2, gen_colour = 'Player1', 'Player2', white_black()
@@ -870,6 +886,8 @@ def assign_players():
     # Agent 1 - white
     agent_type, agent_name = get_agent_type(player1)
     player1 = eval(agent_type)(agent_name, next(gen_colour))
+
+    print("Let's start!\n\n")
 
     # Agent 2 - black
     agent_type, agent_name = get_agent_type(player2)
@@ -949,19 +967,19 @@ def move_through_check(piece, location):
 """
 
 
+def exit_program():
+    """ Exits the program """
+    print('Okay! See you soon :)')
+    sys.exit()
+
+
+def not_implemented(cmd):
+    print(f'<{cmd}> not implemented at this time.')
+    exit_program()
+
+
 def agent_turn(board, player, turn_no):
     pass
-
-
-def main():
-    """ Main control logic of the program
-        Starts by opening up a menu suite for the player to select a game to play
-        Then starts up a game
-    """
-    result = player_wants_game()
-
-    board = set_board(result)
-    print(board)
 
 
 def lets_play(board):
@@ -975,21 +993,74 @@ def lets_play(board):
     # start game loop
     while game_on:
 
-        print(f"{player1}'s turn:")
-        while True:
-            result = player1.get_input(board)  # get agent move/input - contains a close program option
+        print(board)
+        # carry out suite of board state_checks
+        #   checks
+        checks, checking_pieces = board.in_check()
+        if checks:
+            check = True
+            print('                             CHECK!')
+        #   checkmates
+        elif board.in_checkmate():
+            checkmate = True
+            print(f'                         CHECKMATE! {player1} wins!')
+            print('\n                          GAME OVER!\n')
+            game_on = False
+            continue
+        #   draws
+        elif board.is_draw():
+            draw = True
+            print('                        DRAWN GAME!')
+            print('\n                         GAME OVER!\n')
+            game_on = False
+            continue
+        else:
+            print('\n')
+
+        print(f"{player1} to move:")
+        while True:  # this catches moving-into-check type illegal moves
+            while True:  # this catches move notation that does not refer to a piece on the board
+                result = player1.get_input(board)  # get agent move/input - contains a close program option
+                try:
+                    # run move through legal moves
+                    active_piece, target_location, castle_direction = determine_active_piece(board, player1.colour, result)
+                    break
+                except InvalidInput as II:  # if it flags inform the agent and re-ask for a move
+                    print(f'Apologies, {result} failed to identify a unique, legal move.')
+                    print(f'{II}')
+
+            # execute move on board
             try:
-                # run move through legal moves
-                active_piece, target_location, castle_direction = determine_active_piece(board, player1.colour, result)
+                board.move(active_piece, target_location, castle_direction)
                 break
-            except InvalidInput as II:  # if it flags inform the agent and re-ask for a move
-                print(f'Apologies, {result} failed to identify a unique, legal move.')
-                print(f'{II}')
+            except IllegalMove as II:
+                print(f'{player1.name} your king would have been in Check!')
+                print("You'll have to choose another move.\n")
 
-        # execute move on board
-        board.move(active_piece, target_location, castle_direction)
+        print(board)
+        # carry out suite of board state_checks
+        #   checks
+        if board.in_check():
+            check = True
+            print('                             CHECK!')
+        #   checkmates
+        elif board.in_checkmate():
+            checkmate = True
+            print(f'                         CHECKMATE! {player1} wins!')
+            print('\n                          GAME OVER!\n')
+            game_on = False
+            continue
+        #   draws
+        elif board.is_draw():
+            draw = True
+            print('                        DRAWN GAME!')
+            print('\n                         GAME OVER!\n')
+            game_on = False
+            continue
+        else:
+            print('\n')
 
-        print(f"{player2}'s turn:")
+        print(f"{player2} to move:")
         while True:
             result = player2.get_input(board)  # get agent move/input - contains a close program option
             try:
@@ -1003,18 +1074,21 @@ def lets_play(board):
         # execute move on board
         board.move(active_piece, target_location, castle_direction)
 
+        # increment turn number
         turn_no += 1
 
 
-def exit_program():
-    """ Exits the program """
-    print('Okay! See you soon :)')
-    sys.exit()
+def main():
+    """ Main control logic of the program
+        Starts by opening up a menu suite for the player to select a game to play
+        Then starts up a game
+    """
+    result = player_wants_game()
 
+    board = set_board(result)
+    print(board)
 
-def not_implemented(cmd):
-    print(f'<{cmd}> not implemented at this time.')
-    exit_program()
+    lets_play(board)
 
 
 if __name__ == '__main__':
@@ -1025,17 +1099,9 @@ if __name__ == '__main__':
     import sys
     MAIN_VARIABLES()
 
-    # main()
+    main()
 
-    board = Board()
-    print(board)
 
-    agent = Human('Alex', 'White')
-    print(agent)
-    print(repr(agent))
-
-    result = agent.get_input(board)
-    print(result)
 
 
 
