@@ -121,6 +121,12 @@ def run_through_full_game(series_of_legal_moves):
 
         print(board)
 
+        if board.is_checkmate(colour):
+            print(f'                         CHECKMATE! {colour} wins!')
+            print('\n                          GAME OVER!\n')
+        else:
+            print('\n')
+
         count += 1
         print('Turn count: ' + str(count))
 
@@ -143,6 +149,7 @@ if __name__ == '__main__':
     """
     from Exceptions import *
     from main import *
+    import copy
     MAIN_VARIABLES()
     COLOURS = ('White', 'Black')
 

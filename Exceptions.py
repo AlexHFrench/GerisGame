@@ -16,3 +16,13 @@ class IllegalMove(Error):
 class InvalidInput(Error):
     """ Raised when the user inputs a command not recognised by the parser """
     pass
+
+
+class Draw(Error):
+    """ Raised when a game has ended in a draw """
+    pass
+
+
+class Checkmate(Error):
+    """ Raised when a game has ended in a draw """
+    pass

@@ -52,7 +52,9 @@ class Board:
     """
 
     def __init__(self, initial_positions=range(8)):
-        self.sideboard, self.white_in_check, self.black_in_check = [], False, False
+        self.sideboard, self.white_in_check, self.black_in_check, self.draw_counter = [], False, False, 0
+        self.white_in_checkmate, self.black_in_checkmate, self.draw = False, False, False
+        self.white_agent, self.black_agent, self.player_turn, self.turn_num = None, None, 'White', 1.0
         colour_generator = white_black()
         self.squares = [[Empty(next(colour_generator), (row, col)) for col in range(8)] for row in range(8)]
         for row in STARTING_ROWS:
@@ -69,6 +71,7 @@ class Board:
                 if row == 7 and col in initial_positions:
                     type_ = BACK_LINE[col]
                     self.squares[row][col] = eval(type_)('White', self, (row, col))
+        print('just built and set the board, updating pieces..')
         self.update_pieces('Black')
 
     def __str__(self):
@@ -107,8 +110,11 @@ class Board:
                     continue
                 square.look(self)  # have it look at the board
         # this handles niche case where two kings are "fighting over" a single pawn
+        for king in kings:
+            king.clear_vision()
         for index, king in enumerate(kings):
             if king.colour == colour:
+
                 kings[abs(index - 1)].look(self)  # first update the non-playing-player's King
                 king.look(self)  # then the King whose turn it is
 
@@ -128,89 +134,141 @@ class Board:
         pieces = list(pieces)
         return pieces
 
-    def move(self, active_piece, target_location, castle_direction=None):
-        """ Move active_piece from present location to target_location
-            Empty [square] objects are stored in active_piece.temp while checks are made for legality of move
-            In case of capture: active_piece.temp = target_piece s.t. target_piece.temp = Empty object
+    def blind_move(self, start_location, target_location):
+        """ BLIND move of the contents of a start-square to a target-square.
+            No checks are made for legality of any kind!
         """
-        # print('Starting move procedure..')
-        try:
-            start_row, start_col = active_piece.location
-        except AttributeError:
-            print("AttributeError: 'NoneType' object has no attribute 'location'")
-            print(active_piece)
-            print(type(active_piece))
-            print(self.squares[7][6])
-            print(repr(self.squares[7][6]))
-            raise AttributeError
+        start_row, start_col = start_location
+        active_piece = self.squares[start_row][start_col]
+        print(f'\nMoving piece: {repr(active_piece)}')
         end_row, end_col = target_location
 
         self.squares[start_row][start_col] = active_piece.temp  # replace Empty object in active_piece's location
         active_piece.temp = self.squares[end_row][end_col]  # store content of target_location in active_piece's .temp
         self.squares[end_row][end_col] = active_piece  # place active_piece in target_location
 
-        first_move = False
-        if not active_piece.has_moved:  # remember if this is the piece's first move
-            first_move = True
-        active_piece.has_moved = True
+    def test_move(self, active_piece, target_location):
+        """ Creates a copy of the board and moves the piece to the target square.
+            A check is then made for relevant checks - Returns True if move is legal
+        """
+        import copy
 
-        self.update_pieces(active_piece.opp_colour)  # update pieces after moving active_piece
+        test_board = copy.deepcopy(self)  # copy the board
+        test_board.blind_move(active_piece.location, target_location)  # move the piece
+        test_board.update_pieces(active_piece.colour)  # check for checks
 
-        # CHECK FOR CHECKS AGAINST KING OF active_piece
-        checks, _ = self.in_check()
-        if active_piece.colour in checks:
-            # Player either moved into check or ignored an already extant check on the board
-            self.squares[end_row][end_col] = active_piece.temp
-            active_piece.temp = self.squares[start_row][start_col]  # undo previous maneuver
-            print('UPDATING PIECES due to check found!')
-            if first_move:
-                active_piece.has_moved = False
-            self.update_pieces(active_piece.opp_colour)
-            # Raise an IllegalMove error
-            raise IllegalMove(f"{active_piece.colour}'s King is in check!")
-        else:
-            if isinstance(active_piece.temp, Piece):  # if capture
-                # move target_piece to self.sideboard and active_piece.temp the target_location's Empty object
-                self.sideboard, active_piece.temp = active_piece.temp, active_piece.temp.temp
-                # print('Capture successful!')
-            else:
-                # print('Move successful!')
-                if castle_direction:  # if we're castling
-                    if castle_direction == 'Queen':  # check which direction
-                        start_col, end_col = 0, 3
-                    else:
-                        start_col, end_col = 7, 5
-                    active_piece = self.squares[start_row][start_col]  # select the relevant Rook
-                    self.squares[start_row][start_col] = active_piece.temp  # this move code is the same as above
-                    active_piece.temp = self.squares[end_row][end_col]
-                    self.squares[end_row][end_col] = active_piece
+        checks, _ = test_board.get_checks()
+        return active_piece.colour not in checks  # return True if move is legal
 
-    def in_check(self):
+    def move(self, active_piece, active_piece_type, target_location, is_capture, promotion_type, castle_direction):
+        """ Move active_piece from present location to target_location
+            Empty [square] objects are stored in active_piece.temp while checks are made for legality of move
+            In case of capture: active_piece.temp = target_piece s.t. target_piece.temp = Empty object
+        """
+        if self.test_move(active_piece, target_location):  # if the move would not leave King in check..
+            self.blind_move(active_piece.location, target_location)  # execute the move
+
+            if is_capture:  # if it's a capture
+                self.sideboard.append(active_piece.temp)  # move target_piece to self.sideboard
+                active_piece.temp = active_piece.temp.temp  # replace taken piece's .temp onto the board
+            if promotion_type:  # if it's a promotion
+                promote_pawn(self, active_piece, target_location, promotion_type)
+            elif castle_direction:  # if we're castling, we now need to move the Rook
+                if castle_direction == 'Queen':  # check which direction
+                    start_col, end_col = 0, 3
+                else:
+                    start_col, end_col = 7, 5
+                start_row, _ = active_piece.location
+                self.blind_move((start_row, start_col), (start_row, end_col))  # ..and move the Rook
+                print(repr(self.squares[start_row][end_col]))
+                self.squares[start_row][end_col].has_moved = True  # don't forget to mark it as having moved
+        else:  # if the original move would not be legal..
+            print(f'checking if : {target_location} was in avail_m or avail_cap')
+            if target_location in active_piece.avail_moves:  # remove it from the set of possible moves
+                print(f'found it in : avail_moves.. removing it from the list')
+                active_piece.avail_moves.remove(target_location)
+            elif target_location in active_piece.avail_captures:  # remove it from the set of possible moves
+                print(f'found it in : avail_captures.. removing it from the list')
+                active_piece.avail_captures.remove(target_location)
+            print(f'raising IllegalMove exception due to board.test_move returning false!')
+            raise IllegalMove(f"{active_piece.colour}'s King would be in check!")  # raise an exception
+
+
+    def get_checks(self):
+        """ Returns: a list of colours currently in check, i.e. ['White', 'White'] for double check
+                     a list of pieces currently giving check
+            The returned elements are ordered such that zip(elem1, elem2) would form matching pairs.
+        """
+        # print('\nlooking for checks...')
         checks, checking_pieces = [], []
         for colour in COLOURS:  # For each colour
+            # print(f'colour : {colour}')
             king, = self.get_pieces(colour, 'King')  # Find their King
+            # print(f'king being checked : {king}')
             target_location = king.location
+            # print(f"king's location : {king.location}")
             # List opposition pieces with vision of the King
-            any_checking_pieces = self.get_pieces(king.opp_colour, reach_of_check=target_location)
-            for piece in any_checking_pieces:
-                checks.append(colour)
-            checking_pieces.extend(any_checking_pieces)
+            any_checking_pieces = self.get_pieces(king.opp_colour, move_vision=target_location)
+            # print(f'pieces giving check to the king : {any_checking_pieces}')
+            for piece in any_checking_pieces:  # For each of those pieces (if any)
+                checks.append(colour)  # indicate the colour in check
+            checking_pieces.extend(any_checking_pieces)  # and add those pieces to a list
+        # print(f'checks found : {checks}, {checking_pieces}')
         return checks, checking_pieces
 
-    # def is_checkmate(self):
-    #     checks, checking_pieces = self.in_check()
-    #     number = len(checks)
-    #     if number > 1:
-    #         # double check
-    #     elif number:
-    #         # single check
-    #
-    #     else:
-    #         #no checks
-    #         pass
+    def is_checkmate(self, colour):
+        """ Returns True if player of <colour> in checkmate """
+        checkmate = True
+        checks, checking_pieces = self.get_checks()
+        if colour in checks:  # if King is in check..
+            print(f'King of colour: {colour} is in CHECK')
+            king, = self.get_pieces(colour, 'King')
+            legal_king_moves = list(king.avail_moves) + list(king.avail_captures)
+            if len(legal_king_moves) == 0:  # and King has no moves..
+                print(f'King has no moves available')
+                for piece in checking_pieces:  # for each piece checking the king..
+                    locations = squares_in_direction(piece.location, king.location)
+                    for loc in locations:  # can checking_piece be captured or check interposed?
+                        for candidate in self.get_pieces(king.colour, move_vision=loc):  # move_vision also checks caps
+                            if self.test_move(candidate, loc):  # legally?
+                                checkmate = False  # if so, capture/interposition is legal - no checkmate
+                                print(f'it has been noticed that : {candidate} can save the King')
+                                break
+                            else:
+                                pass  # otherwise capture/interposition is not legal - possible checkmate
+            else:
+                checkmate = False
+        else:
+            checkmate = False
 
+        return checkmate
 
+    def is_draw(self, colour):
+        """ Returns True if any Draw condition has been reached.
+            Currently implemented: 50-move-rule, stalemate.
+            Not yet implemented: insufficient mating material, 3-fold-rep.
+        """
+        draw = False
 
+        if self.draw_counter == 50.0:
+            print('Draw by 50 move rule!')
+            draw = True
+
+        if not draw:  # if 50-move-rule not reached
+            draw = True
+            for piece in self.get_pieces(colour):  # check every piece on board of active player
+                # print(f'Checking  : {piece}')
+                # print(f'avail_moves : {piece.avail_moves}')
+                # print(f'avail_captures : {piece.avail_captures}')
+                if piece.avail_moves == set() and piece.avail_captures == set():
+                    pass  # if none turn out to have a legal move then it is a draw
+                else:
+                    draw = False  # if any have a move, it is not a draw
+            if draw:
+                print('Draw by no legal moves!')
+                print(f'{self.get_pieces(colour)}')
+
+        return draw
 
 
 class Empty:
@@ -264,15 +322,15 @@ class Piece:
         avail_captures = [convert_board2san(x) for x in self.avail_captures]
         supporting = [convert_board2san(x) for x in self.supporting]
 
-        return '\n' + str(self) + '\n'\
-            'colour: ' + self.colour + '\n'\
-            'location: ' + str(self.location) + '\n'\
-            '.. in SAN: ' + convert_board2san(self.location) + '\n' \
-            '.. in temp: ' + repr(self.temp) + '\n' \
-            'available moves: ' + str(avail_moves) + '\n'\
-            'available captures: ' + str(avail_captures) + '\n' \
-            'supporting: ' + str(supporting) + '\n' \
-            'has moved: ' + str(self.has_moved)
+        return f'\n {self} \n'\
+            f'colour: {self.colour}\n'\
+            f'location: {self.location}\n'\
+            f'.. in SAN: {convert_board2san(self.location)}\n' \
+            f'.. in temp: {repr(self.temp)}\n' \
+            f'available moves: {avail_moves}\n'\
+            f'available captures: {avail_captures}\n' \
+            f'supporting: {supporting}\n' \
+            f'has moved: {self.has_moved}'
 
     def look(self, board):
         """Piece populates self.avail_moves and self.avail_captures with legal board indices."""
@@ -301,6 +359,10 @@ class Piece:
                 else:
                     self.supporting.add((new_row, new_col))
                     break
+
+    def clear_vision(self):
+        """ Removes a piece's vision of the board completely """
+        self.avail_moves, self.avail_captures, self.supporting = set(), set(), set()
 
     def update_location(self, coord):
         """ Changes the piece's instance variable pertaining to which square it's on """
@@ -361,6 +423,11 @@ class Pawn(Piece):
                     self.supporting.add((new_row, new_col))  # note it down
             else:  # if it is an empty square, note it down
                 self.capture_vision.add((new_row, new_col))  # this is for move-through-check calculations
+
+    def clear_vision(self):
+        """ Totally removes a pieces vision of the board """
+        super().clear_vision()
+        self.capture_vision = set()
 
 
 class Rook(Piece):
@@ -425,7 +492,8 @@ class King(Piece):
 
     def look(self, board):
         super().look(board)
-        checks, _ = board.in_check()
+        # print(f'{self.colour} King is now looking.')
+        checks, _ = board.get_checks()
         if not self.has_moved and self.colour not in checks:  # if not moved and not in check
             row = self.location[0]
             for _, j in self.castle_pattern:  # in both directions along the rank
@@ -433,11 +501,11 @@ class King(Piece):
                 for _ in range(4):
                     if legal(row, new_col):  # if the next square is on the board
                         square = board.squares[row][new_col]  # check it
-                        if isinstance(square, Empty):  # if it's empty and not visible to opponent
+                        if isinstance(square, Empty):  # if it's empty and not visible to opponent..
                             if board.get_pieces(self.opp_colour, reach_of_check=square.location) is not None:
-                                new_col += j
+                                new_col += j  # keep going
                                 continue
-                        elif isinstance(square, Rook):  # if it's a rook and it's not moved
+                        elif isinstance(square, Rook):  # if it's a rook and it's not moved..
                             if not square.has_moved:
                                 castle_location = (row, self.location[1] + j*2)
                                 self.avail_moves.add(castle_location)  # castling is legal
@@ -496,7 +564,14 @@ class Human(Agent):
             result = input('                   Your move:  ')
             print('\n')
             if validate_san(result):
-                return result
+                try:
+                    active_piece, active_piece_type, target_location, is_capture, \
+                        promotion_type, castle_direction = determine_active_piece(board, self.colour, result)
+                except InvalidInput as II:  # if it flags inform the agent and re-ask for a move
+                    print(f'Apologies, {result} failed to identify a unique, legal move.')
+                    print(f'{II}')
+                    continue
+                return active_piece, target_location, castle_direction
             elif result.isalpha():
                 result = result.lower()
                 if result == 'cmd':
@@ -515,7 +590,40 @@ class Random(Agent):
     def __init__(self, name, colour):
         super().__init__(name, colour)
 
-    pass
+    def get_input(self, board):
+        """ selects a random piece, from that piece selects a random move or capture and returns the values """
+        pieces = board.get_pieces(self.colour)
+        pieces_with_moves = []
+        for piece in pieces:
+            if piece.avail_moves == set() and piece.avail_captures == set():
+                pass
+            else:
+                pieces_with_moves.append(piece)
+
+        # if pieces_with_moves:
+        active_piece = random.choice(pieces_with_moves)
+        # else:
+
+        print(repr(active_piece) + '\n')
+        possible_moves = list(active_piece.avail_moves) + list(active_piece.avail_captures)
+        target_location = random.choice(possible_moves)
+        is_capture = bool(target_location in active_piece.avail_captures)
+        print(f'Target square : {target_location}\n')
+
+        castle_direction, promotion_type = '', ''
+        if isinstance(active_piece, King):
+            print(active_piece.location)
+            print(target_location)
+            if abs(active_piece.location[1] - target_location[1]) == 2:
+                if active_piece.location < target_location:
+                    castle_direction = 'King'
+                else:
+                    castle_direction = 'Queen'
+        if isinstance(active_piece, Pawn) and (target_location[1] == 0 or target_location[1] == 7):
+            promotions = ['R', 'N', 'B', 'Q']
+            promotion_type = random.choice(promotions)
+
+        return active_piece, active_piece.__class__.__name__, target_location, is_capture, promotion_type, castle_direction
 
 
 class Engine(Agent):
@@ -552,6 +660,10 @@ def flatten(l, ltypes=(list, tuple)):
                 l[i:i + 1] = l[i]
         i += 1
     return ltype(l)
+
+
+def sign(a):
+    return bool(a > 0) - bool(a < 0)
 
 
 """ CONVERSIONS --------------------------------------------------------------------------------------------------------
@@ -952,15 +1064,82 @@ def determine_active_piece(board, colour, candidate):
                 raise InvalidInput('Disambiguation insufficient: more than one piece able to make this move')
     else:  # in the case of the SAN initially failing to validate
         raise InvalidInput('Move notation failed to validate')
-    return active_piece, target_location, castle_direction
+    return active_piece, active_piece_type, target_location, is_capture, promotion_type, castle_direction
 
 
 def move_through_check(piece, location):
     """ Function specifically for use by Board.get_pieces() in the case of move-into-check calculations """
     if isinstance(piece, Pawn):
-        return location in piece.capture_vision
+        return location in piece.capture_vision or (location in piece.supporting or location in piece.avail_captures)
     else:
-        return location in piece.avail_moves or location in piece.supporting
+        return location in piece.avail_moves or (location in piece.supporting or location in piece.avail_captures)
+
+
+def squares_in_direction(start_loc, end_loc):
+    """ Returns (x, y) positions occurring en-route from start_loc to end_loc.
+        Must be vertical, horizontal or diagonal No Knight moves.
+    """
+    start_row, start_col = start_loc
+    end_row, end_col = end_loc
+    row_diff, col_diff = end_row - start_row, end_col - start_col
+
+    if row_diff != 0:
+        r = range(start_row, end_row + sign(row_diff), sign(row_diff))
+    else:
+        r = [start_row for _ in range(abs(col_diff) + 1)]
+    if col_diff != 0:
+        c = range(start_col, end_col + sign(col_diff), sign(col_diff))
+    else:
+        c = [start_col for _ in range(abs(col_diff) + 1)]
+
+    locations = list(zip(r, c))
+    print(f'locations: {locations}')
+    print(f'end_loc : {end_loc}')
+    if end_loc in locations:
+        locations.remove(end_loc)
+
+    return locations
+
+
+def promote_pawn(board, active_piece, target_location, promotion_type):
+    board.sideboard.append(active_piece)
+    r, c = target_location
+    board.squares[r][c] = eval(LETTERS[promotion_type])(board.player_turn, board, target_location, has_moved=True)
+    board.squares[r][c].temp = active_piece.temp
+
+
+
+def look_for_checkmate(board, colour):
+    """ Raises a Checkmate exception if the designated colour is in checkmate """
+    pass
+
+
+def play_a_game(board, player1, player2):
+
+    players, game_on = [player1, player2], True
+
+    while game_on:
+
+        try:
+            agent_turn(board, *players)
+        except Checkmate as checkmate:
+            board, victor = checkmate.args
+            print(f'                         CHECKMATE! {victor} wins!')
+            print('\n                          GAME OVER!\n')
+            game_on = False
+            continue
+        except Draw as draw:
+            board = draw.args
+            print('                        DRAWN GAME!')
+            print('\n                         GAME OVER!\n')
+            game_on = False
+            continue
+
+        board.turn_num += 0.5
+        players.reverse()
+        board.player_turn, = set(COLOURS) - {board.player_turn}
+
+
 
 
 """ MAIN CONTROL FLOW -------------------------------------------------------------------------------- MAIN CONTROL FLOW 
@@ -978,101 +1157,146 @@ def not_implemented(cmd):
     exit_program()
 
 
-def agent_turn(board, player, turn_no):
-    pass
+def agent_turn(board, active_player, passive_player):
+    """ Logic for a single player's turn """
+
+    print(board)
+    board.update_pieces(board.player_turn)
+
+    if board.is_checkmate(active_player.colour):
+        raise Checkmate(board, passive_player)
+    elif board.is_draw(active_player.colour):
+        raise Draw(board)
+    elif board.white_in_check or board.black_in_check:
+        print(f'                    {active_player.colour} in CHECK!')
+    else:
+        print('\n')
+
+    print(f"{active_player} to move:")
+    while True:  # this catches moving-into-check type illegal moves
+        # get agent move/input - contains a close program option
+        active_piece, active_piece_type, target_location, is_capture, \
+            promotion_type, castle_direction = active_player.get_input(board)
+        # execute move on board
+        try:
+            board.move(active_piece, active_piece_type, target_location, is_capture, promotion_type, castle_direction)
+        # if the move would be Illegal..
+        except IllegalMove as II:
+            print(f'checking if : {target_location} was in avail_m or avail_cap')
+            if target_location in active_piece.avail_moves:  # remove it from the set of possible moves
+                print(f'found it in : avail_moves.. removing it from the list')
+                active_piece.avail_moves.remove(target_location)
+                print(active_piece.avail_moves)
+            elif target_location in active_piece.avail_captures:  # remove it from the set of possible moves
+                print(f'found it in : avail_captures.. removing it from the list')
+                active_piece.avail_captures.remove(target_location)
+                print(active_piece.avail_captures)
+            if board.is_checkmate(active_player.colour):  # after removing the illegal move, recheck for checkmates..
+                raise Checkmate(board, passive_player)
+            elif board.is_draw(active_player.colour):  # and draws
+                raise Draw(board)
+            print(f"{active_player}'s king would have been in Check!")
+            print("You'll have to choose another move.\n")
+        # in the case the move is Legal and is implemented on-board..
+        else:
+            active_piece.has_moved = True  # mark active piece as having moved
+            board.draw_counter += 0.5  # increment draw counter
+            print(f'Draw counter: {board.draw_counter}')
+            if isinstance(active_piece, Pawn):  # if a Pawn was the active piece
+                board.draw_counter = 0  # reset draw counter
+            elif is_capture:  # if there was a legal capture
+                board.draw_counter = 0  # reset draw counter
+            break
+
+    # likely have to look more at CHECK situations
+    # Still haven't addressed the infinite-miss of checkmate and draws via elimination
 
 
-def lets_play(board):
+def lets_play(board, player1, player2):
     """ Main game control logic """
-
-    player1, player2 = assign_players()
 
     # initialise game
     turn_no, game_on = 1, True
 
     # start game loop
     while game_on:
+        print(f'Turn No. : {turn_no}.')
 
         print(board)
-        # carry out suite of board state_checks
-        #   checks
-        checks, checking_pieces = board.in_check()
-        if checks:
-            check = True
-            print('                             CHECK!')
-        #   checkmates
-        elif board.in_checkmate():
-            checkmate = True
-            print(f'                         CHECKMATE! {player1} wins!')
+        checks, _ = board.get_checks()
+        if board.is_checkmate('White'):
+            print(f'                         CHECKMATE! {player2} wins!')
             print('\n                          GAME OVER!\n')
             game_on = False
             continue
-        #   draws
-        elif board.is_draw():
-            draw = True
+        elif board.is_draw(player1.colour):
             print('                        DRAWN GAME!')
             print('\n                         GAME OVER!\n')
             game_on = False
             continue
+        elif checks:
+            print('                             CHECK!')
         else:
             print('\n')
 
         print(f"{player1} to move:")
         while True:  # this catches moving-into-check type illegal moves
-            while True:  # this catches move notation that does not refer to a piece on the board
-                result = player1.get_input(board)  # get agent move/input - contains a close program option
-                try:
-                    # run move through legal moves
-                    active_piece, target_location, castle_direction = determine_active_piece(board, player1.colour, result)
-                    break
-                except InvalidInput as II:  # if it flags inform the agent and re-ask for a move
-                    print(f'Apologies, {result} failed to identify a unique, legal move.')
-                    print(f'{II}')
-
+            # get agent move/input - contains a close program option
+            active_piece, target_location, castle_direction = player1.get_input(board)
+            sideboard = len(list(board.sideboard))  # remember number of pieces on sideboard
+            print(f'Side board : {sideboard}')
             # execute move on board
             try:
                 board.move(active_piece, target_location, castle_direction)
+                active_piece.has_moved = True  # mark active piece as having moved
+                board.draw_counter += 0.5  # increment draw counter
+                print(f'Draw counter: {board.draw_counter}')
+                if isinstance(active_piece, Pawn):  # if a Pawn was the active piece
+                    board.draw_counter = 0  # reset draw counter
+                elif len(list(board.sideboard)) > sideboard:  # if there was a legal capture
+                    board.draw_counter = 0  # reset draw counter
                 break
             except IllegalMove as II:
                 print(f'{player1.name} your king would have been in Check!')
                 print("You'll have to choose another move.\n")
 
         print(board)
-        # carry out suite of board state_checks
-        #   checks
-        if board.in_check():
-            check = True
-            print('                             CHECK!')
-        #   checkmates
-        elif board.in_checkmate():
-            checkmate = True
+        checks, _ = board.get_checks()
+        if board.is_checkmate('Black'):
             print(f'                         CHECKMATE! {player1} wins!')
             print('\n                          GAME OVER!\n')
             game_on = False
             continue
-        #   draws
-        elif board.is_draw():
-            draw = True
+        elif board.is_draw(player2.colour):
             print('                        DRAWN GAME!')
             print('\n                         GAME OVER!\n')
             game_on = False
             continue
+        elif checks:
+            print('                             CHECK!')
         else:
             print('\n')
 
         print(f"{player2} to move:")
-        while True:
-            result = player2.get_input(board)  # get agent move/input - contains a close program option
+        while True:  # this catches moving-into-check type illegal moves
+            # get agent move/input - contains a close program option
+            active_piece, target_location, castle_direction = player2.get_input(board)
+            sideboard = len(list(board.sideboard))  # remember number of pieces on sideboard
+            print(f'Side board : {sideboard}')
+            # execute move on board
             try:
-                # run move through legal moves
-                active_piece, target_location, castle_direction = determine_active_piece(board, player2.colour, result)
+                board.move(active_piece, target_location, castle_direction)
+                active_piece.has_moved = True  # mark active piece as having moved
+                board.draw_counter += 0.5  # increment draw counter
+                print(f'Draw counter: {board.draw_counter}')
+                if isinstance(active_piece, Pawn):  # if a Pawn was the active piece
+                    board.draw_counter = 0  # reset draw counter
+                elif len(list(board.sideboard)) > sideboard:  # if there was a legal capture
+                    board.draw_counter = 0  # reset draw counter
                 break
-            except InvalidInput as II:  # if it flags inform the agent and re-ask for a move
-                print(f'Apologies, {result} failed to identify a unique, legal move.')
-                print(f'{II}')
-
-        # execute move on board
-        board.move(active_piece, target_location, castle_direction)
+            except IllegalMove as II:
+                print(f'{player2.name} your king would have been in Check!')
+                print("You'll have to choose another move.\n")
 
         # increment turn number
         turn_no += 1
@@ -1088,7 +1312,19 @@ def main():
     board = set_board(result)
     print(board)
 
-    lets_play(board)
+    player1, player2 = assign_players()
+
+    lets_play(board, player1, player2)
+
+
+def test():
+    board = Board()
+    print(board)
+
+    player1, player2 = Random('Player1', 'White'), Random('Player2', 'Black')
+
+    # lets_play(board, player1, player2)
+    play_a_game(board, player1, player2)
 
 
 if __name__ == '__main__':
@@ -1097,12 +1333,16 @@ if __name__ == '__main__':
 
     from Exceptions import *
     import sys
+    import copy
+    import random
+    import math
     MAIN_VARIABLES()
 
-    main()
+    # main()
 
-
-
+    for x in range(311):
+        test()
+        print(f'GAMES SINCE LAST CRASH/INFINITE LOOP!                                                              : {x}')
 
 
 
