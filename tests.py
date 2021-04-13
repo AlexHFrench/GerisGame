@@ -111,24 +111,29 @@ def run_through_full_game(series_of_legal_moves):
     count = 2
 
     for candidate in series_of_legal_moves:
-        colour = COLOURS[count % 2]
-        print(colour + "'s turn!")
 
-        print(candidate)
-        active_piece, target_location, castle_direction = determine_active_piece(board, colour, candidate)
-
-        board.move(active_piece, target_location, castle_direction)
-
+        print(f"{board.player_turn}'s turn!")
         print(board)
-
-        if board.is_checkmate(colour):
-            print(f'                         CHECKMATE! {colour} wins!')
+        board.update_pieces(board.player_turn)
+        if board.is_checkmate(board.player_turn):
+            winner, = set(COLOURS) - {board.player_turn}
+            print(f'                         CHECKMATE! {winner} wins!')
             print('\n                          GAME OVER!\n')
         else:
             print('\n')
 
-        count += 1
-        print('Turn count: ' + str(count))
+        print(f'move : {candidate}')
+
+        active_piece, active_piece_type, target_location, is_capture, promotion_type,\
+            castle_direction = decompose_and_assess(board, candidate)
+        board.move(active_piece, active_piece_type, target_location, is_capture, promotion_type, castle_direction)
+
+        active_piece.has_moved = True
+        board.player_turn, = set(COLOURS) - {board.player_turn}
+        board.turn_num += 0.5
+        print(f'Turn count: {board.turn_num}')
+
+        print('\n' * 2)
 
 
 def run_through_all_games():
@@ -261,6 +266,7 @@ if __name__ == '__main__':
     """
 
     board = Board()
+
     print(board)
 
     # print(board.get_pieces('White', 'Pawn'))
@@ -273,6 +279,7 @@ if __name__ == '__main__':
     # print(board.get_pieces('White', 'King'))
     # board.clear()
     # test_all_checks(board)
+
     run_through_all_games()
 
 
