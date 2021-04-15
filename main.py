@@ -124,17 +124,15 @@ class Board:
     def get_pieces(self, colour=None, type_=None, move_vision=None, in_check_vision=None):
         """ Returns all pieces on the board which match the given criteria. """
         pieces = flatten(self.squares)
-        pieces = filter(lambda x: isinstance(x, Piece), pieces)
+        pieces = [x for x in pieces if isinstance(x, Piece)]
         if colour:
-            pieces = filter(lambda x: x.colour == colour, pieces)
+            pieces = [x for x in pieces if x.colour == colour]
         if type_:
-            pieces = filter(lambda x: isinstance(x, eval(type_)), pieces)
+            pieces = [x for x in pieces if isinstance(x, eval(type_))]
         if move_vision:
-            pieces = filter(lambda x: move_vision in x.avail_moves
-                            or move_vision in x.avail_captures, pieces)
+            pieces = [x for x in pieces if move_vision in x.avail_moves.union(x.avail_captures)]
         elif in_check_vision:
-            pieces = filter(lambda x: in_check_vision in x.check_vision, pieces)
-        pieces = list(pieces)
+            pieces = [x for x in pieces if in_check_vision in x.check_vision]
         return pieces
 
     def blind_move(self, start_location, target_location):
@@ -247,7 +245,7 @@ class Board:
     def is_checkmate(self):
         """ Returns True if active_player is in checkmate
         """
-        checkmate, possible_defenders = True, set()
+        checkmate = True
         checks, checking_pieces = self.get_checks(True)
         # print(f'\nCHeck mate checking_pieces1: {checks}\n{checking_pieces}')
 
@@ -279,8 +277,6 @@ class Board:
                         for defender in self.get_pieces(king.colour, move_vision=loc):  # if a piece can reach it..
                             if self.test_move(defender, loc, for_checkmate=True):  # ..can they reach it legally?
                                 checkmate = False  # if so: no checkmate
-                                possible_defenders.add(defender)
-                                possible_defenders.add(king)
                                 # print(f'it has been noticed that : {defender} can save the King')
                                 continue
                             else:
@@ -295,22 +291,24 @@ class Board:
 
         # if checkmate:
             # print(f'king : {repr(king)}')
-        return checkmate, possible_defenders
+        return checkmate
 
     def is_draw(self):
         """ Returns True if any Draw condition has been reached.
             Currently implemented: 50-move-rule, stalemate.
             Not yet implemented: insufficient mating material, 3-fold-rep.
         """
-        draw = False
+        draw, pawn_count, major_count, minor_count = False, 0, 0, 0
 
-        if self.draw_count == 50.0:
-            # print('Draw by 50 move rule!')
-            draw = True
+        if not draw:  # 50 MOVE RULE
+            if self.draw_count == 50.0:
+                print('Draw by 50 move rule!')
+                draw = True
 
-        if not draw:  # if 50-move-rule not reached
+        if not draw:  # STALEMATE
             draw = True
-            for piece in self.get_pieces(self.player_turn):  # check every piece on board of active player
+            pieces = self.get_pieces(self.player_turn)
+            for piece in pieces:  # check every piece on board of active player
                 # print(f'Checking  : {piece}')
                 # print(f'avail_moves : {piece.avail_moves}')
                 # print(f'avail_captures : {piece.avail_captures}')
@@ -318,9 +316,39 @@ class Board:
                     pass  # if none turn out to have a legal move then it is a draw
                 else:
                     draw = False  # if any have a move, it is not a draw
-            # if draw:
-                # print('Draw by no legal moves!')
-                # print(f'{self.get_pieces(self.player_turn)}')
+            if draw:
+                print('Draw by stalemate!')
+
+        if not draw:  # INSUFFICIENT MATERIAL
+            for elem in self.sideboard:  # for all captured pieces..
+                if isinstance(elem, Pawn):  # count pawns
+                    pawn_count += 1
+                if isinstance(elem, Queen) or isinstance(elem, Rook):  # count major pieces
+                    major_count += 1
+                if isinstance(elem, Knight) or isinstance(elem, Bishop):  # count minor pieces
+                    minor_count += 1
+            # check minimum requirements for draw by insufficient material are on the board
+            if pawn_count == 16 and major_count >= 6 and minor_count >= 2:  # if min requirements met
+                pieces, draw = flatten(self.squares), True
+                pieces = [x for x in pieces if isinstance(x, Piece)]  # identify all pieces on-board
+                white_pieces = [x for x in pieces if x.colour == 'White']  # split into white..
+                black_pieces = [x for x in pieces if x not in set(white_pieces)]  # ..and black
+                sets = [white_pieces, black_pieces]
+                for set_ in sets:  # for each set
+                    set_ = [x for x in set_ if not isinstance(x, King)]  # remove the King..
+                    found, count = False, 0
+                    while set_ and len(set_) != count and not found:  # and remove one of..
+                        if isinstance(set_[count], Knight):  # a knight..
+                            set_.pop(count)
+                            found = True
+                        elif isinstance(set_[count], Bishop):  # or a Bishop..
+                            set_.pop(count)
+                            found = True
+                        count += 1
+                    if set_:  # if either side has more than a King and 1 minor piece on the board..
+                        draw = False  # then there is no draw-due-to-insufficient-material on board
+                if draw:
+                    print('Draw by insufficient material!')
 
         return draw
 
@@ -651,7 +679,7 @@ class Human(Agent):
     def __init__(self, name, colour):
         super().__init__(name, colour)
 
-    def get_input(self, board, possible_defenders=None):
+    def get_input(self, board):
         """ Prompts user for their command - Returns the string.
             Ensures it is a viable command or of correct SAN syntax before returning.
         """
@@ -690,17 +718,12 @@ class Random(Agent):
     def __init__(self, name, colour):
         super().__init__(name, colour)
 
-    def get_input(self, board, possible_defenders=None):
+    def get_input(self, board):
         """ selects a random piece, from that piece selects a random move or capture and returns the values """
         pieces = board.get_pieces(self.colour)
-        # this only proccs if there is checkmate threatened on board, thereby limiting legal moves
-        if possible_defenders:
-            pieces = list(possible_defenders)
         pieces_with_moves = []
         for piece in pieces:
-            if piece.avail_moves == set() and piece.avail_captures == set():
-                pass
-            else:
+            if piece.avail_moves or piece.avail_captures:
                 pieces_with_moves.append(piece)
 
         active_piece = random.choice(pieces_with_moves)
@@ -733,7 +756,7 @@ class Scripted(Agent):
         super().__init__(name, colour)
         self.script = script
 
-    def get_input(self, board, possible_defenders=None):
+    def get_input(self, board):
         """ Prompts user for their command - Returns the string.
             Ensures it is a viable command or of correct SAN syntax before returning.
         """
@@ -1511,15 +1534,15 @@ def play_a_game(board, player1, player2):
             agent_turn(board, *players)
         except Checkmate as CM:
             board, victor = CM.args
-            # print(board)
+            print(board)
             print(f'                         CHECKMATE! {victor} wins! after {board.turn_count} moves')
             # print('\n                          GAME OVER!\n')
             game_on = False
             continue
         except Draw as D:
-            board, victor = D.args, None
-            # print(board)
-            # print(f'                        DRAWN GAME! after {board.turn_count} moves')
+            (board, victor) = D.args
+            print(board)
+            print(f'                        DRAWN GAME! after {board.turn_count} moves')
             # print('\n                         GAME OVER!\n')
             game_on = False
             continue
@@ -1553,11 +1576,10 @@ def agent_turn(board, active_player, passive_player):
     board.update_pieces(board.player_turn)  # this is the primary board update in the turn-by-turn cycle of play
 
     # General board assessment: Checkmate, Draw, Checks
-    checkmate, possible_defenders = board.is_checkmate()
-    if checkmate:  # << this also updates board.active_player_in_check status
+    if board.is_checkmate():  # << this also updates board.active_player_in_check status
         raise Checkmate(board, passive_player)
     elif board.is_draw():
-        raise Draw(board)
+        raise Draw(board, passive_player)
     # elif board.active_player_in_check:
         # print(f'                 {active_player} is in CHECK!')
     # else:
@@ -1568,7 +1590,7 @@ def agent_turn(board, active_player, passive_player):
     while True:  # this catches moving-into-check type illegal moves and checkmate/draw by elimination of legal moves
         # get agent move/input - contains a close program option
         active_piece, active_piece_type, target_location, is_capture, \
-            promotion_type, castle_direction = active_player.get_input(board, possible_defenders)
+            promotion_type, castle_direction = active_player.get_input(board)
         # execute move on board
         try:
             board.move(active_piece, active_piece_type, target_location, is_capture, promotion_type, castle_direction)
@@ -1578,11 +1600,10 @@ def agent_turn(board, active_player, passive_player):
                 active_piece.avail_moves.remove(target_location)
             elif target_location in active_piece.avail_captures:  # remove it from the set of possible moves
                 active_piece.avail_captures.remove(target_location)
-            checkmate, possible_defenders = board.is_checkmate()
-            if checkmate:  # after removing the illegal move, recheck for checkmates..
+            if board.is_checkmate():  # after removing the illegal move, recheck for checkmates..
                 raise Checkmate(board, passive_player)
-            elif board.is_draw():  # and draws
-                raise Draw(board)
+            elif board.is_draw():  # and draws..
+                raise Draw(board, passive_player)
             # print(f"{active_player}'s king would have been in Check!")
             # print("You'll have to choose another move.\n")
         # in the case the move is Legal and is implemented on-board..
@@ -1636,11 +1657,14 @@ def test_checkmates(legal_checkmates):
             print(f'game {index + 1} FAILED!')
 
 
+
 if __name__ == '__main__':
     """ ------------------------------------------------- MAIN LOGIC ---------------------------------------------------
     """
 
     from Exceptions import *
+    from timeit import default_timer as timer
+    from numpy import mean
     import sys
     import copy
     import random
@@ -1651,8 +1675,8 @@ if __name__ == '__main__':
 
     # main()
 
-    # for x in range(100):
-    #     test()
-    #     print(f'{x}, ' * 30)
+    for x in range(100):
+        test()
+        print(f'{x}, ' * 30)
 
-    test_checkmates(legal_checkmates)
+    # test_checkmates(legal_checkmates)
