@@ -24,5 +24,10 @@ class Draw(Error):
 
 
 class Checkmate(Error):
-    """ Raised when a game has ended in a draw """
+    """ Raised when a game has ended in checkmate on board """
+    pass
+
+
+class Resignation(Error):
+    """ Raised when a game has ended by a player resignation """
     pass

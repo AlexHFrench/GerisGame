@@ -51,24 +51,24 @@ class Board:
                 is_checkmate ()
     """
 
-    def __init__(self, initial_positions=range(8)):
+    def __init__(self, piece_positions=range(8), pawn_positions=range(8)):
         self.sideboard, self.passant_loc, self.previous_move_loc = [], tuple(), tuple()
         self.player_turn, self.turn_count, self.draw_count, self.passant_count = 'White', 1.0, 0, 0.0
         self.active_player_in_checkmate, self.active_player_in_check, self.draw = False, False, False
         colour_generator = white_black()
-        self.squares = [[Empty(next(colour_generator), (row, col)) for col in range(8)] for row in range(8)]
+        self.squares = [[Empty(next(colour_generator), self, (row, col)) for col in range(8)] for row in range(8)]
         for row in STARTING_ROWS:
             for col in range(8):
-                if row == 0 and col in initial_positions:  # only instantiate pieces indicated by the type of game
+                if row == 0 and col in piece_positions:  # only instantiate pieces indicated by the type of game
                     type_ = BACK_LINE[col]
                     self.squares[row][col] = eval(type_)('Black', self, (row, col))
-                if row == 1:
+                if row == 1 and col in pawn_positions:
                     type_ = FRONT_LINE[col]
                     self.squares[row][col] = eval(type_)('Black', self, (row, col))
-                if row == 6:
+                if row == 6 and col in pawn_positions:
                     type_ = FRONT_LINE[col]
                     self.squares[row][col] = eval(type_)('White', self, (row, col))
-                if row == 7 and col in initial_positions:
+                if row == 7 and col in piece_positions:
                     type_ = BACK_LINE[col]
                     self.squares[row][col] = eval(type_)('White', self, (row, col))
         # print('just built and set the board, updating pieces..')
@@ -93,7 +93,7 @@ class Board:
         """ remove all pieces from an already extant Board object
         """
         colour_generator = white_black()
-        self.squares = [[Empty(next(colour_generator), (row, col)) for col in range(8)] for row in range(8)]
+        self.squares = [[Empty(next(colour_generator), self, (row, col)) for col in range(8)] for row in range(8)]
 
     def update_pieces(self, colour):
         """ This updates each piece s.r.t. their legal moves given current board state.
@@ -111,15 +111,16 @@ class Board:
                 square.look(self)  # ..have it look at the board
 
         # this handles niche case where two kings are "fighting over" a single pawn
-        kings[0].clear_vision()
-        kings[1].clear_vision()
+        if kings:  # in case board is empty
+            kings[0].clear_vision()  # clear their vision
+            kings[1].clear_vision()
 
-        if kings[0].colour == self.player_turn:
-            kings[1].look(self)
-            kings[0].look(self)
-        else:
-            kings[0].look(self)
-            kings[1].look(self)
+            if kings[0].colour == self.player_turn:  # and reinstate it..
+                kings[1].look(self)  # passive king first..
+                kings[0].look(self)
+            else:
+                kings[0].look(self)
+                kings[1].look(self)
 
     def get_pieces(self, colour=None, type_=None, move_vision=None, in_check_vision=None):
         """ Returns all pieces on the board which match the given criteria. """
@@ -152,17 +153,23 @@ class Board:
         # DOUBLE STEP PHASE (en passant)
         if isinstance(active_piece, Pawn):  # if there's a Pawn..
             if abs(start_row - end_row) == 2:  # ..making a double step..
-                for i in range(-1, 2, 2):  # check left and right
-                    test_col = end_col + i
-                    if not legal(end_row, test_col):  # if the coord is legal..
-                        continue
-                    new_neighbour = self.squares[end_row][test_col]  # look at the square..
-                    # if there's an opposition Pawn..
-                    if isinstance(new_neighbour, Pawn) and new_neighbour.colour != active_piece.colour:
-                        path = squares_in_direction(start_location, target_location)
-                        passant_location, = set(path) - {start_location}
-                        self.passant_loc = passant_location  # ..update the en_passant flag
-                        self.passant_count = self.turn_count  # and start the timer
+                path = squares_in_direction(start_location, target_location)
+                passant_location, = set(path) - {start_location}  # identify the 'single-step' square..
+                self.passant_loc = passant_location  # ..update the en_passant flag..
+                self.passant_count = self.turn_count  # ..and start the timer
+                # THE FOLLOWING IS GHOST CODE, TO BE IMPLEMENTED IF X-FEN IS TO BE USED IN FUTURE!
+                # see >> https://en.wikipedia.org/wiki/X-FEN#Encoding_en-passant
+                # for i in range(-1, 2, 2):  # check left and right
+                #     test_col = end_col + i
+                #     if not legal(end_row, test_col):  # if the coord is legal..
+                #         continue
+                #     new_neighbour = self.squares[end_row][test_col]  # look at the square..
+                #     # if there's an opposition Pawn..
+                #     if isinstance(new_neighbour, Pawn) and new_neighbour.colour != active_piece.colour:
+                #         path = squares_in_direction(start_location, target_location)
+                #         passant_location, = set(path) - {start_location}
+                #         self.passant_loc = passant_location  # ..update the en_passant flag
+                #         self.passant_count = self.turn_count  # and start the timer
 
         # CAPTURE PHASE (en passant)
         if self.passant_loc == target_location:  # if the target square is the en passant location..
@@ -172,8 +179,8 @@ class Board:
                 captured_pawn = self.squares[row_behind][end_col]  # select the captured pawn
                 self.squares[row_behind][
                     end_col] = captured_pawn.temp  # replace Empty object in its previous location
-                captured_pawn.temp = active_piece.temp  # Empty object into captured_pawn's .temp
-                active_piece.temp = captured_pawn  # and captured_pawn into active_piece's .temp
+                captured_pawn.temp = active_piece.temp  # ..Empty object into captured_pawn's .temp
+                active_piece.temp = captured_pawn  # ..and captured_pawn into active_piece's .temp
 
     def test_move(self, active_piece, target_location, for_checkmate=False):
         """ Creates a copy of the board and moves the piece to the target square.
@@ -356,7 +363,7 @@ class Board:
 class Empty:
     """ Empty square, place holder object. Has colour and location."""
 
-    def __init__(self, colour, location):
+    def __init__(self, colour, board, location, has_moved=None):
         self.colour = colour
         self.location = location
 
@@ -697,17 +704,17 @@ class Human(Agent):
                     continue
                 return active_piece, active_piece_type, target_location, is_capture, promotion_type, castle_direction
 
-            try:
+            elif user_input.isalpha():
                 user_input = user_input.lower()
                 if user_input == 'cmd':
                     in_game_commands()
-                if user_input == 'resign':
+                elif user_input == 'resign':
                     not_implemented('resign')
-                if user_input == 'save':
+                elif user_input == 'save':
                     not_implemented('save')
-                if user_input == 'close':
+                elif user_input in ('close', 'quit', 'exit', 'no'):
                     exit_program()
-            except:
+            else:
                 print(f"Apologies, '{user_input}' failed to identify recognisable move or command.")
                 continue
 
@@ -790,141 +797,6 @@ class Engine(Agent):
     pass
 
 
-""" UTILS --------------------------------------------------------------------------------------------------------------
-"""
-
-
-def white_black():
-    """ Infinitely yields 'White', 'Black', 'White', 'Black', etc."""
-    while True:
-        yield 'White'
-        yield 'Black'
-
-
-def flatten(l, ltypes=(list, tuple)):
-    ltype = type(l)
-    l = list(l)
-    i = 0
-    while i < len(l):
-        while isinstance(l[i], ltypes):
-            if not l[i]:
-                l.pop(i)
-                i -= 1
-                break
-            else:
-                l[i:i + 1] = l[i]
-        i += 1
-    return ltype(l)
-
-
-def sign(a):
-    return bool(a > 0) - bool(a < 0)
-
-
-""" CONVERSIONS --------------------------------------------------------------------------------------------------------
-"""
-
-
-def legal(a, b):
-    """Returns True if the given index is on the board (both indices in 0-7)"""
-    return a in range(8) and b in range(8)
-
-
-def convert_san2board(san):
-    """ accepts a board location in SAN (Standard Algebraic Notation) - must be pre-validated
-        returns a board location as tuple of form (row, col)
-    """
-    coord = []
-    if san:
-        letter, number = list(san)
-        coord = (8 - int(number), FILES[letter])
-    return coord
-
-
-def convert_board2san(coord):
-    """ accepts a board location as tuple of integers of form (row, col)
-        returns a board location in SAN (Standard Algebraic Notation)
-    """
-    result = []
-    if coord:
-        rank = 8 - coord[0]
-        files = list(FILES.keys())
-        file = files[coord[1]]
-        result = ''.join([file, str(rank)])
-    return result
-
-
-def validate_san(san):
-    """ validates a string, is compliant to the notation conventions of SAN >>
-        (https://en.wikipedia.org/wiki/Algebraic_notation_(chess))
-        returns: MatchObject OR None
-
-        pieces: R - rook, N - knight, B - bishop, K - king, Q - queen, pawns are not denoted by a character
-        captures: x placed immediately before the target's square - eg: Nxf5
-            pawns making captures are designated by their file prior to capturing: a, b, c, d, e, f, g, h - eg: exd4
-        when disambiguating the active piece one may (in descending order of preference):
-            indicate the file of departure
-            indicate the rank of departure
-            indicate both (very rare)
-            eg: Rdf8, R1a3, Qh4e1
-        promotion: trailing notation of piece being promoted to - eg: e8Q, f8N
-        none-san valid strings: 'draw', 'resign', 'save', 'quit'
-        castling: 0-0, 0-0-0 for king and queen side respectively, note those are ZEROs
-        check: trailing '+'
-        checkmate: trailing '#'
-        end of game: 1-0, 0-1, ½-½ for white victory, black victory and draw respectively
-    """
-    result = re.search('[RNBQK]?[a-h]?[1-8]?[x]?[a-h][1-8][RNBQ]?[+#]?|0-0-?0?|O-O-?O?', san)
-    return result
-
-
-def decompose_san(san):
-    """ for details of SAN see docstring for validate_san above
-        take a pre-validated san string and returns:
-            (0 - active piece type - STR,
-             1 - active piece disambiguation - STR,
-             2 - capture - BOOL,
-             3 - target square - STR,
-             4 - post-promotion piece type - STR,
-             5 - check/check-mate claim - STR
-             6 - castles - STR)
-    """
-    result = ['', '', False, '', '', '', '']
-
-    if san.endswith('#'):
-        result[5] = '#'
-        san = san[:-1]
-    if san.endswith('+'):
-        result[5] = '+'
-        san = san[:-1]
-    if san == '0-0' or san == 'O-O':
-        result[0], result[3], result[6] = 'King', 'g1 g8', 'King'
-        return tuple(result)
-    if san == '0-0-0' or san == 'O-O-O':
-        result[0], result[3], result[6] = 'King', 'c1 c8', 'Queen'
-        return tuple(result)
-    if san.endswith(('R', 'N', 'B', 'Q')):
-        result[4] = san[-1]
-        san = san[:-1]
-    result[3] = san[-2:]
-    san = san[:-2]
-    if san.startswith(('R', 'N', 'B', 'Q', 'K')):
-        result[0] = san[0]
-        san = san[1:]
-    elif not san.startswith(('0', 'O')):
-        result[0] = 'Pawn'
-    if 'x' in san:
-        result[2] = True
-        san = san[:-1]
-    result[1] = san
-
-    for i, elem in enumerate(result):  # 'P' >> 'Pawn' for all ['P','R','N','B','K','Q'] in results
-        if elem in LETTERS:
-            result[i] = LETTERS[elem]
-
-    return tuple(result)
-
-
 """ GLOBAL IMPORT & VARIABLE DEFINITIONS -------------------------------------------------------------------------------
 """
 
@@ -958,6 +830,7 @@ def MAIN_VARIABLES():
         'B': 'Bishop',
         'K': 'King',
         'Q': 'Queen',
+        'E': 'Empty',
     }
 
     PATTERNS = {
@@ -1028,7 +901,14 @@ def TEST_STUFF():
     global game_28, game_29, game_30, game_31, game_32, game_33, game_34, game_35, game_36
     global game_37, game_38, game_39, game_40, game_41, game_42, game_43, game_44, game_45
     global game_46, game_47, game_48, game_49, legal_checkmates
+    global fens, fen_1, fen_2, fen_3, fen_4
 
+    fen_1 = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
+    fen_2 = 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1'
+    fen_3 = 'rnbqkbnr/pp1ppppp/8/2p5/4P3/8/PPPP1PPP/RNBQKBNR w KQkq c6 0 2'
+    fen_4 = 'rnbqkbnr/pp1ppppp/8/2p5/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2'
+
+    fens = [fen_1, fen_2, fen_3, fen_4]
 
     game_1 = '1. e4 d5 '\
         '2. exd5 Qxd5 3. Nc3 Qd8 4. Bc4 Nf6 5. Nf3 Bg4 6. h3 Bxf3 '\
@@ -1261,6 +1141,145 @@ def TEST_STUFF():
                         game_42, game_43, game_44, game_45, game_46, game_47, game_48, game_49]
 
 
+""" UTILS --------------------------------------------------------------------------------------------------------------
+"""
+
+
+def white_black():
+    """ Infinitely yields 'White', 'Black', 'White', 'Black', etc."""
+    while True:
+        yield 'White'
+        yield 'Black'
+
+
+def flatten(l, ltypes=(list, tuple)):
+    ltype = type(l)
+    l = list(l)
+    i = 0
+    while i < len(l):
+        while isinstance(l[i], ltypes):
+            if not l[i]:
+                l.pop(i)
+                i -= 1
+                break
+            else:
+                l[i:i + 1] = l[i]
+        i += 1
+    return ltype(l)
+
+
+def sign(a):
+    return bool(a > 0) - bool(a < 0)
+
+
+""" CONVERSIONS --------------------------------------------------------------------------------------------------------
+"""
+
+
+def legal(a, b):
+    """Returns True if the given index is on the board (both indices in 0-7)"""
+    return a in range(8) and b in range(8)
+
+
+def convert_san2board(san):
+    """ accepts a board location in SAN (Standard Algebraic Notation) - must be pre-validated
+        returns a board location as tuple of form (row, col)
+    """
+    coord = []
+    if san:
+        letter, number = list(san)
+        coord = (8 - int(number), FILES[letter])
+    return coord
+
+
+def convert_board2san(coord):
+    """ accepts a board location as tuple of integers of form (row, col)
+        returns a board location in SAN (Standard Algebraic Notation)
+    """
+    result = []
+    if coord:
+        rank = 8 - coord[0]
+        files = list(FILES.keys())
+        file = files[coord[1]]
+        result = ''.join([file, str(rank)])
+    return result
+
+
+def validate_san(san):
+    """ validates a string, is compliant to the notation conventions of SAN >>
+        (https://en.wikipedia.org/wiki/Algebraic_notation_(chess))
+        returns: MatchObject OR None
+
+        pieces: R - rook, N - knight, B - bishop, K - king, Q - queen, pawns are not denoted by a character
+        captures: x placed immediately before the target's square - eg: Nxf5
+            pawns making captures are designated by their file prior to capturing: a, b, c, d, e, f, g, h - eg: exd4
+        when disambiguating the active piece one may (in descending order of preference):
+            indicate the file of departure
+            indicate the rank of departure
+            indicate both (very rare)
+            eg: Rdf8, R1a3, Qh4e1
+        promotion: trailing notation of piece being promoted to - eg: e8Q, f8N
+        none-san valid strings: 'draw', 'resign', 'save', 'quit'
+        castling: 0-0, 0-0-0 for king and queen side respectively, note those are ZEROs
+        check: trailing '+'
+        checkmate: trailing '#'
+        end of game: 1-0, 0-1, ½-½ for white victory, black victory and draw respectively
+    """
+    result = re.search('[RNBQK]?[a-h]?[1-8]?[x]?[a-h][1-8][RNBQ]?[+#]?|0-0-?0?|O-O-?O?', san)
+    return result
+
+
+def decompose_san(san):
+    """ for details of SAN see docstring for validate_san above
+        take a pre-validated san string and returns:
+            (0 - active piece type - STR,
+             1 - active piece disambiguation - STR,
+             2 - capture - BOOL,
+             3 - target square - STR,
+             4 - post-promotion piece type - STR,
+             5 - check/check-mate claim - STR
+             6 - castles - STR)
+    """
+    result = ['', '', False, '', '', '', '']
+
+    if san.endswith('#'):
+        result[5] = '#'
+        san = san[:-1]
+    if san.endswith('+'):
+        result[5] = '+'
+        san = san[:-1]
+    if san == '0-0' or san == 'O-O':
+        result[0], result[3], result[6] = 'King', 'g1 g8', 'King'
+        return tuple(result)
+    if san == '0-0-0' or san == 'O-O-O':
+        result[0], result[3], result[6] = 'King', 'c1 c8', 'Queen'
+        return tuple(result)
+    if san.endswith(('R', 'N', 'B', 'Q')):
+        result[4] = san[-1]
+        san = san[:-1]
+    result[3] = san[-2:]
+    san = san[:-2]
+    if san.startswith(('R', 'N', 'B', 'Q', 'K')):
+        result[0] = san[0]
+        san = san[1:]
+    elif not san.startswith(('0', 'O')):
+        result[0] = 'Pawn'
+    if 'x' in san:
+        result[2] = True
+        san = san[:-1]
+    result[1] = san
+
+    for i, elem in enumerate(result):  # 'P' >> 'Pawn' for all ['P','R','N','B','K','Q'] in results
+        if elem in LETTERS:
+            result[i] = LETTERS[elem]
+
+    return tuple(result)
+
+
+def generate_fen(board):
+    pass
+
+
 """ VARIOUS TEST FUNCTIONS ---------------------------------------------------------------------- VARIOUS TEST FUNCTIONS
 """
 
@@ -1280,23 +1299,71 @@ def strip_to_script(text):
     return white_script, black_script
 
 
+""" GUI MANAGEMENT -------------------------------------------------------------------------------------- GUI MANAGEMENT 
+"""
+
+
+def gui_test():
+    pass
+
+
 """ MENU CONTROL FLOW -------------------------------------------------------------------------------- MAIN CONTROL FLOW 
 """
+
+
+def not_implemented(cmd):
+    print(f'<{cmd}> not implemented at this time.')
+    exit_program()
 
 
 def player_wants_game():
     """ Determines if player wants to play a game, see more advanced game options or quit the program """
     while True:
-        print('Do you want to play a game? <yes/no>')
+        print('Do you want to play a game?  <yes/no>                                every menu..  <close/quit/exit/no>')
         print('Advanced options             <adv>')
-        result = input('    :  ').lower()
+        try:
+            result = input('    :  ').lower()
+        except:
+            continue
 
         if result == 'yes':
             return 1
-        elif result == 'no':
-            exit_program()
         elif result == 'adv':
             return advanced_game_options()
+        elif result.lower() in ('close', 'quit', 'exit', 'no'):
+            exit_program()
+
+
+def player_wants_fen():
+    """ Determines if player wants to load a saved game, load a saved FEN or manually enter another FEN """
+    while True:
+        print('Load what from where?')
+        print('    5 - Saved game from local storage')
+        print('    6 - FEN from local storage')
+        print('    7 - FEN by manually entering')
+        print('    <back>')
+        print('    <help>')
+        print('    <close/quit/exit/no>')
+        result = input('    :  ')
+        print('\n')
+
+        if result.isnumeric():
+            if result == '5':
+                not_implemented('LOAD FROM LOCAL SAVE')
+            if result == '6':
+                not_implemented('LOAD FROM LOCAL FEN')
+            if result == '7':
+                return int(result)
+        elif result.isalpha():
+            if result.lower() == 'back':
+                return
+            elif result.lower() == 'help':
+                print('    FEN - https://en.wikipedia.org/wiki/Forsyth%E2%80%93Edwards_Notation')
+                print('    Saved games to be found locally in dir "SavedGames" ')
+                print('    FENs stored locally can be found locally in dir "FENs"')
+                input('\n')
+            elif result.lower() in ('close', 'quit', 'exit', 'no'):
+                exit_program()
 
 
 def advanced_game_options():
@@ -1307,8 +1374,9 @@ def advanced_game_options():
         print('    2 - King and Pawn game')
         print('    3 - Minor piece game')
         print('    4 - Major piece game')
-        print('    help - <help>')
-        print('    exit - <quit/exit/no>')
+        print('    <load>')
+        print('    <help>')
+        print('    <close/quit/exit/no>')
         result = input('    :  ')
         print('\n')
 
@@ -1320,9 +1388,12 @@ def advanced_game_options():
             print('    King and Pawn game - Both sides have only King and Pawns')
             print('    Minor piece game   - Both side have only King, Pawns and Bishops and Knights')
             print('    Major piece game   - Both side have only King, Pawns and Queen and Rooks')
-            print('\n')
-            pass
-        elif result.lower() in ('quit', 'exit', 'no'):
+            input('\n')
+        elif result.lower() == 'load':
+            result = player_wants_fen()
+            if result in range(5, 8):
+                return result
+        elif result.lower() in ('close', 'quit', 'exit', 'no'):
             exit_program()
 
 
@@ -1334,6 +1405,118 @@ def set_board(result):
     return board
 
 
+def convert_fen2board(fen):
+    """ validates a string compliant to the notation conventions of FEN >>
+                https://en.wikipedia.org/wiki/Forsyth%E2%80%93Edwards_Notation
+                returns: MatchObject OR None
+
+                There are six fields:
+                    1 - placement of pieces..
+                        pieces: Pp - pawn, Rr - rook, Nn - knight, Bb - bishop, Kk - king, Qq - queen
+                        colour: White - uppercase, Black - lowercase
+                        position: rank8/rank7/rank6/..
+                        empty squares: indicated by numbers 1-8
+                    2 - Colour of active_player..
+                        White - 'w', Black - 'b'
+                    3 - Castling availability..
+                        k, K, q, Q - black_king_side, white_king_side, black_queen_side, white_queen_side
+                    4 - En passant target square in SAN.. 'e3', 'f5, etc.
+                    5 - Half-move clock.. number of 'halfmoves' since last pawn move or piece capture for 50-move-rule
+                    6 - Full-move clock.. number of turns executed thus far, starting at 1 and +1 at end of black's turn
+        """
+    print(fen)
+    sections = fen.split()
+    if len(sections) != 6:
+        raise InvalidInput('Not six elements in FEN')
+    positions, active_player_colour, castling_avail, en_passant_target, half_move_count, full_move_count = sections
+
+    # BUILD BOARD AND PIECES - first elem
+    rows = positions.split('/')
+    if len(rows) != 8:
+        raise InvalidInput('Elem1 of FEN incorrect syntax; not 8 rows delineated')
+    board, new_board = Board([], []), []  # generate Empty board
+    # check each FEN row for syntax..
+    for row in rows:
+        if not re.match(r'[1-8pPrRnNbBkKqQ-]{1,8}$', row):
+            raise InvalidInput()
+        row = [x if x not in '12345678' else list('e'*int(x)) for x in list(row)]
+        row = flatten(row)
+        new_board.append(row)
+    # load FEN onto the board..
+    for row in range(8):
+        for col in range(8):
+            count = row * 8 + col
+            letter = new_board[row][col]
+            if letter == 'e':  # identify colour of Empty squares..
+                if count % 2 == 0:
+                    letter = letter.upper()
+            if letter.isupper():  # and of the pieces..
+                colour = 'White'
+            else:
+                colour = 'Black'
+                letter = letter.upper()
+            type_, has_moved = LETTERS[letter], True  # prep piece details
+            if letter == 'P' and (row == 1 or row == 6): has_moved = False  # identify unmoved Pawns
+            board.squares[row][col] = eval(type_)(colour, board, (row, col), has_moved)  # ..then fill the board
+
+    # ACTIVE PLAYER COLOUR - second elem
+    if active_player_colour == 'w':
+        colour = 'White'
+    elif active_player_colour == 'b':
+        colour = 'Black'
+    else:
+        raise InvalidInput('Elem2 of FEN incorrect; must be "w" or "b"')
+    board.player_turn = colour
+    print(board.player_turn)
+
+    # CASTLING AVAILABILITY - third elem
+    print(castling_avail)
+    if 'q' in castling_avail:  # Black's queen-side castling still legal
+        board.squares[0][0].has_moved, board.squares[0][4].has_moved = False, False
+        print("Black's queen-side castling still legal")
+    if 'k' in castling_avail:  # Black's king-side castling still legal
+        board.squares[0][7].has_moved, board.squares[0][4].has_moved = False, False
+        print("Black's king-side castling still legal")
+    if 'Q' in castling_avail:  # White's queen-side castling still legal
+        board.squares[7][0].has_moved, board.squares[7][4].has_moved = False, False
+        print("White's queen-side castling still legal")
+    if 'K' in castling_avail:  # White's king-side castling still legal
+        board.squares[7][7].has_moved, board.squares[7][4].has_moved = False, False
+        print("White's king-side castling still legal")
+
+    # EN PASSANT INDICATION - fourth elem
+    if en_passant_target != '-' and re.match('[a-h][1-8]$', en_passant_target):
+        coord = convert_san2board(en_passant_target)
+        if coord[0] == 4 or coord[0] == 2:
+            board.passant_loc = coord
+    elif en_passant_target == '-':
+        pass
+    else:
+        raise InvalidInput('Elem4 of FEN incorrect; must be legal coord of 3rd or 5th rank')
+
+    # HALF-MOVE COUNTER - fifth elem
+    if int(half_move_count) < 0:
+        raise InvalidInput('Elem5 of FEN incorrect; must be int of 0 or greater')
+    else:
+        board.draw_count = int(half_move_count)/2
+
+    # TURN NUMBER COUNTER - sixth elem
+    if int(full_move_count) < 1:
+        raise InvalidInput('Elem6 of FEN incorrect; must be int of 1 or greater')
+    else:
+        board.turn_count = int(full_move_count)
+        if board.player_turn == 'Black': board.turn_count += 0.5
+        if board.passant_loc:  # if en passant is on the board then set the en passant timer
+            board.passant_count = board.turn_count - 0.5
+    print(board)
+    print(f'\nboard.draw_count    {board.draw_count}')
+    print(f'board.passant_loc   {board.passant_loc}')
+    print(f'board.passant_count   {board.passant_count}')
+    print(f'board.turn_count  {board.turn_count}')
+
+    return board
+
+
 def get_agent_type(player):
     """ Prompts user for info as to the type of agent to be created """
     print('There are three kinds of Agents you can initialise.')
@@ -1341,8 +1524,8 @@ def get_agent_type(player):
     print('                You are playing the game yourself.')
     print('    2 - <Random> - This is an agent who simply makes totally random moves.')
     print('                 They select from the set of all legal moves.')
-    print('    3 - <Engine> - This is an agent which selects moves on the basis of some')
-    print('                 pre-programmed algorithm.')
+    # print('    3 - <Engine> - This is an agent which selects moves on the basis of some')
+    # print('                 pre-programmed algorithm.')
     print(f'\nWhich type of agent should {player} be?')
 
     while True:
@@ -1355,9 +1538,11 @@ def get_agent_type(player):
             elif result.lower() == 'random':
                 agent_type = result.capitalize()
                 break
-            elif result.lower() == 'engine':
-                agent_type = result.capitalize()
-                break
+            # elif result.lower() == 'engine':
+            #     not_implemented('Engine')
+            #     continue
+            elif result.lower() in ('close', 'quit', 'exit', 'no'):
+                exit_program()
         elif result.isnumeric():
             if result == '1':
                 agent_type = 'Human'
@@ -1365,9 +1550,9 @@ def get_agent_type(player):
             elif result == '2':
                 agent_type = 'Random'
                 break
-            elif result == '3':
-                agent_type = 'Engine'
-                break
+            # elif result == '3':
+            #     not_implemented('Engine')
+            #     continue
 
     agent_name = player
     print(f'And their name? Typing nothing will use the default name: {player}')
@@ -1376,6 +1561,8 @@ def get_agent_type(player):
         if result == '':
             break
         elif result.isalnum():
+            if result.lower() in ('close', 'quit', 'exit', 'no'):
+                exit_program()
             agent_name = result
             break
         else:
@@ -1384,23 +1571,13 @@ def get_agent_type(player):
     return agent_type, agent_name
 
 
-def in_game_commands():
-    print('    <resign> the game')
-    print('    <save> the game for later continuation from current position')
-    print('    <close> the program\n')
-
-
-""" GAME CONTROL FLOW -------------------------------------------------------------------------------- MAIN CONTROL FLOW 
-"""
-
-
 def assign_players():
     """ Takes operator through process of initialising the two agents involved
         in the game - Returns two Agent() instances as player1 & player2
     """
     print('This is the Agent Creation Wizard.\n')
     print("We'll take you through the process of initialising the Agents who will be playing the game.")
-    print('Player1 (white) and Player2 (black).')
+    print('Player1 (White) and Player2 (Black).')
     print("Let's start!\n\n")
 
     player1, player2, gen_colour = 'Player1', 'Player2', white_black()
@@ -1416,6 +1593,16 @@ def assign_players():
     player2 = eval(agent_type)(agent_name, next(gen_colour))
 
     return player1, player2
+
+
+def in_game_commands():
+    print('    <resign> the game')
+    print('    <save> the game for later continuation from current position')
+    print('    <close> the program\n')
+
+
+""" GAME CONTROL FLOW -------------------------------------------------------------------------------- MAIN CONTROL FLOW 
+"""
 
 
 def disambiguate(candidates, disambiguation):
@@ -1519,9 +1706,62 @@ def promote_pawn(board, active_piece, target_location, promotion_type):
     board.squares[r][c].temp = active_piece.temp
 
 
-def look_for_checkmate(board, colour):
-    """ Raises a Checkmate exception if the designated colour is in checkmate """
-    pass
+def agent_turn(board, active_player, passive_player):
+    """ Logic for a single player's turn """
+    # Print and update board
+    print(board)
+    board.update_pieces(board.player_turn)  # this is the primary board update in the turn-by-turn cycle of play
+
+    # General board assessment: Checkmate, Draw, Checks
+    if board.is_checkmate():  # << this also updates board.active_player_in_check status
+        raise Checkmate(board, passive_player)
+    elif board.is_draw():
+        raise Draw(board, passive_player)
+    elif board.active_player_in_check:
+        print(f'                 {active_player} is in CHECK!')
+    else:
+        print('\n')
+    print(f'\nboard.draw_count    {board.draw_count}')
+    print(f'board.passant_loc   {board.passant_loc}')
+    print(f'board.passant_count   {board.passant_count}')
+    print(f'board.turn_count  {board.turn_count}')
+
+    # Present agent opportunity to move/enter command..
+    print(f"{active_player} to move:")
+    while True:  # this catches moving-into-check type illegal moves and checkmate/draw by elimination of legal moves
+        # Get agent move/input - contains a close program option
+        active_piece, active_piece_type, target_location, is_capture, \
+        promotion_type, castle_direction = active_player.get_input(board)
+        # Execute move on board
+        try:
+            board.move(active_piece, active_piece_type, target_location, is_capture, promotion_type,
+                       castle_direction)
+        # If the move would be Illegal..
+        except IllegalMove as II:
+            if target_location in active_piece.avail_moves:  # remove it from the set of possible moves
+                active_piece.avail_moves.remove(target_location)
+            elif target_location in active_piece.avail_captures:  # remove it from the set of possible moves
+                active_piece.avail_captures.remove(target_location)
+            if board.is_checkmate():  # after removing the illegal move, recheck for checkmates..
+                raise Checkmate(board, passive_player)
+            elif board.is_draw():  # and draws..
+                raise Draw(board, passive_player)
+            print(f"{active_player}'s king would have been in Check!")
+            print("You'll have to choose another move.\n")
+        # If move is Legal and implemented on-board..
+        else:
+            if board.turn_count != board.passant_count:  # if the en passant timer did not start this half-turn..
+                board.passant_loc = tuple()  # ..then there is no legal en passant on the board
+                board.passant_count = 0
+            board.active_player_in_check = False  # by definition, active_player not in Check
+            active_piece.has_moved = True  # mark active piece as having moved
+            board.draw_count += 0.5  # increment draw counter
+            if isinstance(active_piece, Pawn):  # if a Pawn was the active piece
+                board.draw_count = 0  # reset draw counter
+            elif is_capture:  # if there was a legal capture
+                board.draw_count = 0  # reset draw counter
+
+            break
 
 
 def play_a_game(board, player1, player2):
@@ -1529,21 +1769,21 @@ def play_a_game(board, player1, player2):
     players, game_on = [player1, player2], True
 
     while game_on:
-        # print(f'                                   Turn No.  : {board.turn_count}')
+        print(f'                                   Turn No.  : {board.turn_count}')
         try:
             agent_turn(board, *players)
         except Checkmate as CM:
             board, victor = CM.args
             print(board)
             print(f'                         CHECKMATE! {victor} wins! after {board.turn_count} moves')
-            # print('\n                          GAME OVER!\n')
+            print('\n                          GAME OVER!\n')
             game_on = False
             continue
         except Draw as D:
             (board, victor) = D.args
             print(board)
             print(f'                        DRAWN GAME! after {board.turn_count} moves')
-            # print('\n                         GAME OVER!\n')
+            print('\n                         GAME OVER!\n')
             game_on = False
             continue
 
@@ -1564,75 +1804,58 @@ def exit_program():
     sys.exit()
 
 
-def not_implemented(cmd):
-    print(f'<{cmd}> not implemented at this time.')
-    exit_program()
-
-
-def agent_turn(board, active_player, passive_player):
-    """ Logic for a single player's turn """
-    # print and update board
-    # print(board)
-    board.update_pieces(board.player_turn)  # this is the primary board update in the turn-by-turn cycle of play
-
-    # General board assessment: Checkmate, Draw, Checks
-    if board.is_checkmate():  # << this also updates board.active_player_in_check status
-        raise Checkmate(board, passive_player)
-    elif board.is_draw():
-        raise Draw(board, passive_player)
-    # elif board.active_player_in_check:
-        # print(f'                 {active_player} is in CHECK!')
-    # else:
-        # print('\n')
-
-    # present agent opportunity to move/enter command..
-    # print(f"{active_player} to move:")
-    while True:  # this catches moving-into-check type illegal moves and checkmate/draw by elimination of legal moves
-        # get agent move/input - contains a close program option
-        active_piece, active_piece_type, target_location, is_capture, \
-            promotion_type, castle_direction = active_player.get_input(board)
-        # execute move on board
-        try:
-            board.move(active_piece, active_piece_type, target_location, is_capture, promotion_type, castle_direction)
-        # if the move would be Illegal..
-        except IllegalMove as II:
-            if target_location in active_piece.avail_moves:  # remove it from the set of possible moves
-                active_piece.avail_moves.remove(target_location)
-            elif target_location in active_piece.avail_captures:  # remove it from the set of possible moves
-                active_piece.avail_captures.remove(target_location)
-            if board.is_checkmate():  # after removing the illegal move, recheck for checkmates..
-                raise Checkmate(board, passive_player)
-            elif board.is_draw():  # and draws..
-                raise Draw(board, passive_player)
-            # print(f"{active_player}'s king would have been in Check!")
-            # print("You'll have to choose another move.\n")
-        # in the case the move is Legal and is implemented on-board..
-        else:
-            if board.turn_count != board.passant_count:  # if the en passant timer did not start this turn..
-                board.passant_loc = tuple()  # ..then there is no legal en passant on the board
-            board.active_player_in_check = False  # by definition, active_player not in Check
-            active_piece.has_moved = True  # mark active piece as having moved
-            # board.previous_move_loc = target_location  # remember the new position of active piece (en passant)
-            board.draw_count += 0.5  # increment draw counter
-            if isinstance(active_piece, Pawn):  # if a Pawn was the active piece
-                board.draw_count = 0  # reset draw counter
-            elif is_capture:  # if there was a legal capture
-                board.draw_count = 0  # reset draw counter
-            # print('ENDOFTURN')
-            break
-
-
 def main():
     """ Main control logic of the program
-        Starts by opening up a menu suite for the player to select a game to play
-        Then starts up a game
+            - chose board starting position from selection of variants, saved games or FENs
+            - chose type of agents to play the game (human, random, etc)
+            - play the game out
+        Repeat until user closes program
     """
-    result = player_wants_game()
+    # META Program Loop
+    while True:
 
-    board = set_board(result)
-    print(board)
+        decision = False
+        while not decision:
+            result = player_wants_game()
+            print(result)
 
-    player1, player2 = assign_players()
+            if result in range(1, 5):
+                board = set_board(result)
+                decision = True
+                continue
+            elif result == 5:
+                print('Apologies, feature not yet implemented.\n')
+                pass
+            elif result == 6:
+                print('Apologies, feature not yet implemented.\n')
+                pass
+            elif result == 7:
+                print('Please enter the FEN                                                              <back>')
+                fen = input('          :    ')
+                if fen.isalpha():
+                    if fen.lower() == 'back':
+                        continue
+                try:
+                    board = convert_fen2board(fen)
+                except InvalidInput as II:
+                    print({II})
+                    pass
+                except:
+                    print('Something went wrong')
+                    pass
+                else:
+                    decision = True
+                    continue
+
+        print(board)
+
+        player1, player2 = assign_players()
+        players = [player1, player2]
+        # Can happen due to loading game from FEN
+        if board.player_turn == 'Black':
+            players.reverse()
+
+        play_a_game(board, *players)
 
 
 def test():
@@ -1657,26 +1880,35 @@ def test_checkmates(legal_checkmates):
             print(f'game {index + 1} FAILED!')
 
 
-
 if __name__ == '__main__':
     """ ------------------------------------------------- MAIN LOGIC ---------------------------------------------------
     """
 
     from Exceptions import *
     from timeit import default_timer as timer
-    from numpy import mean
     import sys
     import copy
     import random
     import sys
+    # import pygame
+    # import kivy
+    import numpy
     import math
     MAIN_VARIABLES()
     TEST_STUFF()
 
+    # for fen in fens:
+    #     convert_fen2board(fen)
+
     # main()
 
-    for x in range(100):
-        test()
-        print(f'{x}, ' * 30)
+    # for x in range(100):
+    #     test()
+    #     print(f'{x}, ' * 30)
 
     # test_checkmates(legal_checkmates)
+
+    # board = convert_fen2board(fen_2)
+
+
+
