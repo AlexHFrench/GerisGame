@@ -51,7 +51,7 @@ class Board:
     def __init__(self, piece_positions=range(8), pawn_positions=range(8)):
         self.sideboard, self.passant_loc = [], tuple()
         self.player_turn, self.turn_count, self.draw_count, self.passant_count = 'White', 1.0, 0, 0.0
-        self.active_player_in_checkmate, self.active_player_in_check, self.draw = False, False, False
+        self.checkmate, self.active_player_in_check, self.draw = False, False, False
         colour_generator = white_black()
 
         # Generate empty board
@@ -290,6 +290,7 @@ class Board:
             return  # No checks: no checkmate
 
         prepare_for_game_end(self)
+        self.checkmate = True
         raise Checkmate('Checkmate on board!', self, last_player_to_move)
 
     def is_draw(self, last_player_to_move):
@@ -1925,7 +1926,7 @@ def play_a_game(board, player1, player2):
             with open('tmp.txt', 'w') as tmp:  # we overwrite this most recent state
                 tmp.write(convert_board2fen(board, tmp=True) + ' \n')
 
-    return board
+    return board, player_of_final_move
 
 
 """ MAIN CONTROL FLOW -------------------------------------------------------------------------------- MAIN CONTROL FLOW 
@@ -2026,9 +2027,10 @@ def test_checkmates(legal_checkmates):
         white_script, black_script = strip_to_scripts(game)
         player1, player2 = Scripted('Player1', 'White', white_script), Scripted('Player2', 'Black', black_script)
 
-        if play_a_game(board, player1, player2):
+        board, player_of_last_move = play_a_game(board, player1, player2)
+        if board.checkmate:  # game ended in checkmate
             print(f'game {index + 1} PASSED!')
-        else:
+        else:  # game did not end in checkmate
             print(f'game {index + 1} FAILED!')
 
 
