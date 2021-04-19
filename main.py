@@ -1724,7 +1724,7 @@ def decompose_and_assess(board, candidate):
 
     # if the input SAN notation fails to validate..
     if not validate_san(candidate):
-        raise InvalidInput('Move notation failed to validate, potential syntax issue')  # raise an exception
+        raise InvalidInput('Move notation failed to validate, potential syntax issue\n')  # raise an exception
 
     # if the input SAN is good..
     else:
@@ -1747,11 +1747,7 @@ def decompose_and_assess(board, candidate):
 
         # if NO pieces able to make such a move..
         if not active_pieces:  # print some debugging stuff..
-            print(f'player_turn : {board.player_turn}')
-            print(f'active_pieces : {active_pieces}')
-            print(f'active_piece_type : {active_piece_type}')
-            print(f'target_location : {target_location}')
-            raise InvalidInput('No piece able to execute such a move')  # and raise an exception
+            raise InvalidInput('No piece able to execute such a move\n')  # and raise an exception
         # if ONLY ONE piece can make the move..
         elif len(active_pieces) == 1:
             active_piece, = active_pieces  # return it
@@ -1761,7 +1757,7 @@ def decompose_and_assess(board, candidate):
             try:
                 active_piece, = active_pieces  # there should now only be 1 piece..
             except ValueError:  # if not raise an exception
-                raise InvalidInput('Disambiguation insufficient: more than one piece able to make this move')
+                raise InvalidInput('Disambiguation insufficient: more than one piece able to make this move\n')
 
     return active_piece, active_piece_type, target_location, is_capture, promotion_type, castle_direction
 
@@ -1901,14 +1897,12 @@ def play_a_game(board, player1, player2):
             agent_turn(board, *players)  # Execute the active_player's turn
         except Checkmate as CM:
             txt, board, player_of_final_move = CM.args
-            print(board)
             print(f'                CHECKMATE! {player_of_final_move} wins! After {math.floor(board.turn_count)} moves')
             print('\n                 GAME OVER!\n')
             game_on = False
             continue
         except Draw as D:
             txt, board, player_of_final_move = D.args
-            print(board)
             print(f'                        {txt} After {math.floor(board.turn_count)} moves')
             print('\n                         GAME OVER!\n')
             game_on = False
