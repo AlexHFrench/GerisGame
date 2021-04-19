@@ -23,7 +23,7 @@ NOTE:
         'row'; the integer index(0-7) of the board.squares array pertaining to the ->
         'rank'; an element of the board.squares array, containing pieces and empty squares
         'col'; the integer index(0-7) of the boar.squares array pertaining to the file
-        'board indices'; the pair of indices (row, col) indexing a square (board.squares[row][col])
+        'board location'; the pair of indices (row, col) indexing a square (board.squares[row][col])
 
 """
 """ --------------------------- IMPORTS
