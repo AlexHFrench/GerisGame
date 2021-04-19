@@ -1,9 +1,8 @@
 # Gerry's Game
-#   ...enjoy! :D
+#   ...enjoy!
 
 
 """
-
 NOTE:
     board.squares is an array: board.squares[rank][file]
         [
@@ -126,7 +125,7 @@ FILES = {'a': 0, 'b': 1, 'c': 2, 'd': 3, 'e': 4, 'f': 5, 'g': 6, 'h': 7}
 IN_GAME_COMMANDS = ['resign', 'save', 'tmp', 'close']
 
 
-""" BOARD & PIECES --------------------------------------------------------------------------------------------- CLASSES
+""" BOARD & PIECE CLASSES ------------------------------------------------------------------------ BOARD & PIECE CLASSES
 """
 
 
@@ -720,7 +719,7 @@ class Queen(Piece):
         self.steps = 7
 
 
-""" AGENTS ----------------------------------------------------------------------------------------------------- CLASSES
+""" AGENT CLASSES ---------------------------------------------------------------------------------------- AGENT CLASSES
 """
 
 
@@ -886,103 +885,7 @@ class Engine(Agent):
 """
 
 
-# def MAIN_VARIABLES():
-#     """ All constant variables for the main logic of the program
-#         I separated this into a function to make tests.py function more cleanly
-#     """
-#
-#     """ --------------------------- MAIN VARIABLES
-#     """
-#     global COLOURS, VALUES, LETTERS, PATTERNS, STEPS, UNICODES, STANDARD_GAME
-#     global KING_AND_PAWN_GAME, MINOR_GAME, MAJOR_GAME, FRONT_LINE, BACK_LINE, FILES
-#     global IN_GAME_COMMANDS, TYPES
-#
-#     COLOURS = ('White', 'Black')
-#
-#     VALUES = {
-#         'Pawn': 1,
-#         'Rook': 5,
-#         'Knight': 3,
-#         'Bishop': 3,
-#         'King': 100,
-#         'Queen': 9,
-#     }
-#
-#     LETTERS = {
-#         'P': 'Pawn',
-#         'R': 'Rook',
-#         'N': 'Knight',
-#         'B': 'Bishop',
-#         'K': 'King',
-#         'Q': 'Queen',
-#         'E': 'Empty',
-#     }
-#
-#     TYPES = {
-#         'White': {
-#             'Pawn': 'P', 'Rook': 'R', 'Knight': 'N',
-#             'Bishop': 'B', 'King': 'K', 'Queen': 'Q'},
-#         'Black': {
-#             'Pawn': 'p', 'Rook': 'r', 'Knight': 'n',
-#             'Bishop': 'b', 'King': 'k', 'Queen': 'q'}
-#     }
-#
-#     PATTERNS = {
-#         'Pawn': [(1, 1), (1, -1)],
-#         'Rook': [(1, 0), (0, 1), (-1, 0), (0, -1)],
-#         'Knight': [(1, 2), (2, 1), (-1, 2), (2, -1), (-2, 1), (1, -2), (-1, -2), (-2, -1)],
-#         'Bishop': [(1, 1), (1, -1), (-1, 1), (-1, -1)],
-#         'King': [(0, 1), (1, 0), (1, 1), (-1, 0), (0, -1), (-1, 1), (1, -1), (-1, -1)],
-#         'Queen': [(0, 1), (1, 0), (1, 1), (-1, 0), (0, -1), (-1, 1), (1, -1), (-1, -1)],
-#     }
-#
-#     STEPS = {
-#         'Pawn': 1,
-#         'Rook': 7,
-#         'Knight': 1,
-#         'Bishop': 7,
-#         'King': 1,
-#         'Queen': 7,
-#     }
-#
-#     # The following have been designated THE WRONG WAY AROUND for the purposes of appearing more visually correct
-#     # on a white-black-inverted terminal window
-#     UNICODES = {
-#         'Black': {
-#             'Pawn': '♙',
-#             'Rook': '♖',
-#             'Knight': '♘',
-#             'Bishop': '♗',
-#             'King': '♔',
-#             'Queen': '♕',
-#         },
-#         'White': {
-#             'Pawn': '♟',
-#             'Rook': '♜',
-#             'Knight': '♞',
-#             'Bishop': '♝',
-#             'King': '♚',
-#             'Queen': '♛',
-#         },
-#     }
-#
-#     # Columns on which pieces start the game
-#     STANDARD_GAME = (0, 1, 2, 3, 4, 5, 6, 7)  # all pieces
-#     KING_AND_PAWN_GAME = 4,  # only the king
-#     MINOR_GAME = (1, 2, 4, 5, 6)  # minor pieces + king
-#     MAJOR_GAME = (0, 3, 4, 7)  # major pieces + king
-#
-#     # Pieces in the order they appear on the board - could add fischer-random at some point
-#     BACK_LINE = ('Rook', 'Knight', 'Bishop', 'Queen', 'King', 'Bishop', 'Knight', 'Rook')
-#
-#     # Files
-#     FILES = {'a': 0, 'b': 1, 'c': 2, 'd': 3, 'e': 4, 'f': 5, 'g': 6, 'h': 7}
-#
-#     # Non-move commands player can enter during a game
-#     IN_GAME_COMMANDS = ['resign', 'save', 'tmp', 'close']
-
-
-def TEST_STUFF():
+def test_variables():
     """ variables needed for various tests """
     global game_1, game_2, game_3, game_4, game_5, game_6, game_7, game_8, game_9
     global game_10, game_11, game_12, game_13, game_14, game_15, game_16, game_17, game_18
@@ -1245,7 +1148,7 @@ def strip_to_scripts(text):
     return white_script, black_script
 
 
-""" UTILS --------------------------------------------------------------------------------------------------------------
+""" UTILS -------------------------------------------------------------------------------------------------------- UTILS
 """
 
 
@@ -1289,7 +1192,7 @@ def sign(a):
     return bool(a > 0) - bool(a < 0)
 
 
-""" CONVERSIONS --------------------------------------------------------------------------------------------------------
+""" CONVERSIONS -------------------------------------------------------------------------------------------- CONVERSIONS
 """
 
 
@@ -1624,73 +1527,6 @@ def convert_fen2board(fen):
     return board
 
 
-def convert_board2fen(board, tmp=False):
-    """ Returns a FEN representation of a given board as a string.
-        Does not modify the Board.
-        "tmp" flag: Returns a truncated version with only first 4 FEN elements (board_rep, colour, castling, en_passant)
-    """
-    # GENERATE BOARD REPRESENTATION STRING
-    empty_count, txt = 0, []
-    for row in range(8):
-        for col in range(8):
-            square = board.squares[row][col]  # for each square on the board..
-            if isinstance(square, Empty):  # ..if it's empty..
-                empty_count += 1  # ..add it to a running total
-            else:  # if it's a piece..
-                if empty_count >= 1:  # ..with preceding empty squares..
-                    txt.append(str(empty_count))  # ..append the number of those empty squares..
-                    empty_count = 0  # ..and reset the running total
-                letter = TYPES[square.colour][square.__class__.__name__]  # then note the type and colour of the piece
-                txt.append(letter)
-        if empty_count >= 1:  # if no piece at end of a row
-            txt.append(str(empty_count))  # append the empty count
-            empty_count = 0  # and reset
-        if row != 7:  # if at the end of a row, apart from the last, note that
-            txt.append('/')
-
-    # COLOUR-TO-MOVE
-    if board.player_turn == 'White':
-        letter = 'w'
-    else:
-        letter = 'b'
-    txt.append(' ' + letter)
-
-    # CASTLING LEGALITIES
-    txt.append(' ')
-    row, sides = [7, 0], {7: 'King', 0: 'Queen'}
-    for index, colour in enumerate(COLOURS):  # for each colour.. (white first)
-        king_sq = board.squares[row[index]][4]  # check the king's home square
-        if isinstance(king_sq, King) and not king_sq.has_moved:  # if it is a king, which has not moved..
-            for col, side in sides.items():  # go on to check its rooks..
-                rook_sq = board.squares[row[index]][col]  # for each side.. (king-side first)
-                if isinstance(rook_sq, Rook) and not rook_sq.has_moved:  # if it is a rook, which has not moved..
-                    letter = TYPES[colour][sides[col]]  # note that castling on that side is legal
-                    txt.append(letter)
-    if txt[-1] == ' ':  # note if no legal castles on board
-        txt.append('-')
-
-    # EN PASSANT SQUARE DETAILS
-    if board.passant_loc:
-        san = convert_board2san(board.passant_loc)
-        txt.append(' ' + san)
-    else:
-        txt.append(' -')
-
-    # FUNCTION TERMINATION - truncated version of FEN for use in 3-fold-rep calculation
-    if tmp:  # for 3-fold-rep this is all we need..
-        return ''.join(txt)
-
-    # HALF-MOVE CLOCK (Draw counter)
-    hmc = str(int(board.draw_count * 2))
-    txt.append(' ' + hmc)
-
-    # FULL-MOVE NUMBER (Turn counter)
-    fmn = str(math.floor(board.turn_count))
-    txt.append(' ' + fmn)
-
-    return ''.join(txt)
-
-
 def get_agent_type(player):
     """ Prompts user for info as to the type of agent to be created """
     print('There are two kinds of Agents you can initialise.')
@@ -1881,6 +1717,73 @@ def promote_pawn(board, active_piece, target_location, promotion_type):
     # Initialise and place the promotion piece
     board.squares[r][c] = eval(promotion_type)(board.player_turn, board, target_location, has_moved=True)
     board.squares[r][c].temp = active_piece.temp  # Replace the Empty object into the new piece's .temp field
+
+
+def convert_board2fen(board, tmp=False):
+    """ Returns a FEN representation of a given board as a string.
+        Does not modify the Board.
+        "tmp" flag: Returns a truncated version with only first 4 FEN elements (board_rep, colour, castling, en_passant)
+    """
+    # GENERATE BOARD REPRESENTATION STRING
+    empty_count, txt = 0, []
+    for row in range(8):
+        for col in range(8):
+            square = board.squares[row][col]  # for each square on the board..
+            if isinstance(square, Empty):  # ..if it's empty..
+                empty_count += 1  # ..add it to a running total
+            else:  # if it's a piece..
+                if empty_count >= 1:  # ..with preceding empty squares..
+                    txt.append(str(empty_count))  # ..append the number of those empty squares..
+                    empty_count = 0  # ..and reset the running total
+                letter = TYPES[square.colour][square.__class__.__name__]  # then note the type and colour of the piece
+                txt.append(letter)
+        if empty_count >= 1:  # if no piece at end of a row
+            txt.append(str(empty_count))  # append the empty count
+            empty_count = 0  # and reset
+        if row != 7:  # if at the end of a row, apart from the last, note that
+            txt.append('/')
+
+    # COLOUR-TO-MOVE
+    if board.player_turn == 'White':
+        letter = 'w'
+    else:
+        letter = 'b'
+    txt.append(' ' + letter)
+
+    # CASTLING LEGALITIES
+    txt.append(' ')
+    row, sides = [7, 0], {7: 'King', 0: 'Queen'}
+    for index, colour in enumerate(COLOURS):  # for each colour.. (white first)
+        king_sq = board.squares[row[index]][4]  # check the king's home square
+        if isinstance(king_sq, King) and not king_sq.has_moved:  # if it is a king, which has not moved..
+            for col, side in sides.items():  # go on to check its rooks..
+                rook_sq = board.squares[row[index]][col]  # for each side.. (king-side first)
+                if isinstance(rook_sq, Rook) and not rook_sq.has_moved:  # if it is a rook, which has not moved..
+                    letter = TYPES[colour][sides[col]]  # note that castling on that side is legal
+                    txt.append(letter)
+    if txt[-1] == ' ':  # note if no legal castles on board
+        txt.append('-')
+
+    # EN PASSANT SQUARE DETAILS
+    if board.passant_loc:
+        san = convert_board2san(board.passant_loc)
+        txt.append(' ' + san)
+    else:
+        txt.append(' -')
+
+    # FUNCTION TERMINATION - truncated version of FEN for use in 3-fold-rep calculation
+    if tmp:  # for 3-fold-rep this is all we need..
+        return ''.join(txt)
+
+    # HALF-MOVE CLOCK (Draw counter)
+    hmc = str(int(board.draw_count * 2))
+    txt.append(' ' + hmc)
+
+    # FULL-MOVE NUMBER (Turn counter)
+    fmn = str(math.floor(board.turn_count))
+    txt.append(' ' + fmn)
+
+    return ''.join(txt)
 
 
 def three_fold_rep():
@@ -2116,7 +2019,7 @@ def test_checkmates(legal_checkmates):
 """
 if __name__ == '__main__':
 
-    # TEST_STUFF()
+    # test_variables()
 
     # for x in range(100):
     #     test()
