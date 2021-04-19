@@ -26,11 +26,104 @@ NOTE:
         'board location'; the pair of indices (row, col) indexing a square (board.squares[row][col])
 
 """
-""" --------------------------- IMPORTS
-        """
+""" IMPORTS & CONSTANT VARIABLES ---------------------------------------------------------- IMPORTS & CONSTANT VARIABLES
+"""
 
-import re
 from Exceptions import *
+from pathlib import Path
+from timeit import default_timer as timer
+import re
+import sys
+import copy
+import random
+import os
+import numpy
+import math
+
+COLOURS = ('White', 'Black')
+
+VALUES = {
+    'Pawn': 1,
+    'Rook': 5,
+    'Knight': 3,
+    'Bishop': 3,
+    'King': 100,
+    'Queen': 9,
+}
+
+LETTERS = {
+    'P': 'Pawn',
+    'R': 'Rook',
+    'N': 'Knight',
+    'B': 'Bishop',
+    'K': 'King',
+    'Q': 'Queen',
+    'E': 'Empty',
+}
+
+TYPES = {
+    'White': {
+        'Pawn': 'P', 'Rook': 'R', 'Knight': 'N',
+        'Bishop': 'B', 'King': 'K', 'Queen': 'Q'},
+    'Black': {
+        'Pawn': 'p', 'Rook': 'r', 'Knight': 'n',
+        'Bishop': 'b', 'King': 'k', 'Queen': 'q'}
+}
+
+PATTERNS = {
+    'Pawn': [(1, 1), (1, -1)],
+    'Rook': [(1, 0), (0, 1), (-1, 0), (0, -1)],
+    'Knight': [(1, 2), (2, 1), (-1, 2), (2, -1), (-2, 1), (1, -2), (-1, -2), (-2, -1)],
+    'Bishop': [(1, 1), (1, -1), (-1, 1), (-1, -1)],
+    'King': [(0, 1), (1, 0), (1, 1), (-1, 0), (0, -1), (-1, 1), (1, -1), (-1, -1)],
+    'Queen': [(0, 1), (1, 0), (1, 1), (-1, 0), (0, -1), (-1, 1), (1, -1), (-1, -1)],
+}
+
+STEPS = {
+    'Pawn': 1,
+    'Rook': 7,
+    'Knight': 1,
+    'Bishop': 7,
+    'King': 1,
+    'Queen': 7,
+}
+
+# The following have been designated THE WRONG WAY AROUND for the purposes of appearing more visually correct
+# on a white-black-inverted terminal window
+UNICODES = {
+    'Black': {
+        'Pawn': '♙',
+        'Rook': '♖',
+        'Knight': '♘',
+        'Bishop': '♗',
+        'King': '♔',
+        'Queen': '♕',
+    },
+    'White': {
+        'Pawn': '♟',
+        'Rook': '♜',
+        'Knight': '♞',
+        'Bishop': '♝',
+        'King': '♚',
+        'Queen': '♛',
+    },
+}
+
+# Columns on which pieces start the game
+STANDARD_GAME = (0, 1, 2, 3, 4, 5, 6, 7)  # all pieces
+KING_AND_PAWN_GAME = 4,  # only the king
+MINOR_GAME = (1, 2, 4, 5, 6)  # minor pieces + king
+MAJOR_GAME = (0, 3, 4, 7)  # major pieces + king
+
+# Pieces in the order they appear on the board - could add fischer-random at some point
+BACK_LINE = ('Rook', 'Knight', 'Bishop', 'Queen', 'King', 'Bishop', 'Knight', 'Rook')
+
+# Files
+FILES = {'a': 0, 'b': 1, 'c': 2, 'd': 3, 'e': 4, 'f': 5, 'g': 6, 'h': 7}
+
+# Non-move commands player can enter during a game
+IN_GAME_COMMANDS = ['resign', 'save', 'tmp', 'close']
+
 
 """ BOARD & PIECES --------------------------------------------------------------------------------------------- CLASSES
 """
@@ -786,104 +879,106 @@ class Engine(Agent):
     pass
 
 
-""" GLOBAL IMPORT & VARIABLE DEFINITIONS -------------------------------------------------------------------------------
+""" TEST FUNCTIONS & VARIABLE DEFINITIONS ---------------------------------------- TEST FUNCTIONS & VARIABLE DEFINITIONS
+    Switched testing here - test.py became too cumbersome
+        with imports and function & variable definitions..
 """
 
 
-def MAIN_VARIABLES():
-    """ All constant variables for the main logic of the program
-        I separated this into a function to make tests.py function more cleanly
-    """
-
-    """ --------------------------- MAIN VARIABLES
-    """
-    global COLOURS, VALUES, LETTERS, PATTERNS, STEPS, UNICODES, STANDARD_GAME
-    global KING_AND_PAWN_GAME, MINOR_GAME, MAJOR_GAME, FRONT_LINE, BACK_LINE, FILES
-    global IN_GAME_COMMANDS, TYPES
-
-    COLOURS = ('White', 'Black')
-
-    VALUES = {
-        'Pawn': 1,
-        'Rook': 5,
-        'Knight': 3,
-        'Bishop': 3,
-        'King': 100,
-        'Queen': 9,
-    }
-
-    LETTERS = {
-        'P': 'Pawn',
-        'R': 'Rook',
-        'N': 'Knight',
-        'B': 'Bishop',
-        'K': 'King',
-        'Q': 'Queen',
-        'E': 'Empty',
-    }
-
-    TYPES = {
-        'White': {
-            'Pawn': 'P', 'Rook': 'R', 'Knight': 'N',
-            'Bishop': 'B', 'King': 'K', 'Queen': 'Q'},
-        'Black': {
-            'Pawn': 'p', 'Rook': 'r', 'Knight': 'n',
-            'Bishop': 'b', 'King': 'k', 'Queen': 'q'}
-    }
-
-    PATTERNS = {
-        'Pawn': [(1, 1), (1, -1)],
-        'Rook': [(1, 0), (0, 1), (-1, 0), (0, -1)],
-        'Knight': [(1, 2), (2, 1), (-1, 2), (2, -1), (-2, 1), (1, -2), (-1, -2), (-2, -1)],
-        'Bishop': [(1, 1), (1, -1), (-1, 1), (-1, -1)],
-        'King': [(0, 1), (1, 0), (1, 1), (-1, 0), (0, -1), (-1, 1), (1, -1), (-1, -1)],
-        'Queen': [(0, 1), (1, 0), (1, 1), (-1, 0), (0, -1), (-1, 1), (1, -1), (-1, -1)],
-    }
-
-    STEPS = {
-        'Pawn': 1,
-        'Rook': 7,
-        'Knight': 1,
-        'Bishop': 7,
-        'King': 1,
-        'Queen': 7,
-    }
-
-    # The following have been designated THE WRONG WAY AROUND for the purposes of appearing more visually correct
-    # on a white-black-inverted terminal window
-    UNICODES = {
-        'Black': {
-            'Pawn': '♙',
-            'Rook': '♖',
-            'Knight': '♘',
-            'Bishop': '♗',
-            'King': '♔',
-            'Queen': '♕',
-        },
-        'White': {
-            'Pawn': '♟',
-            'Rook': '♜',
-            'Knight': '♞',
-            'Bishop': '♝',
-            'King': '♚',
-            'Queen': '♛',
-        },
-    }
-
-    # Columns on which pieces start the game
-    STANDARD_GAME = (0, 1, 2, 3, 4, 5, 6, 7)  # all pieces
-    KING_AND_PAWN_GAME = 4,  # only the king
-    MINOR_GAME = (1, 2, 4, 5, 6)  # minor pieces + king
-    MAJOR_GAME = (0, 3, 4, 7)  # major pieces + king
-
-    # Pieces in the order they appear on the board - could add fischer-random at some point
-    BACK_LINE = ('Rook', 'Knight', 'Bishop', 'Queen', 'King', 'Bishop', 'Knight', 'Rook')
-
-    # Files
-    FILES = {'a': 0, 'b': 1, 'c': 2, 'd': 3, 'e': 4, 'f': 5, 'g': 6, 'h': 7}
-
-    # Non-move commands player can enter during a game
-    IN_GAME_COMMANDS = ['resign', 'save', 'tmp', 'close']
+# def MAIN_VARIABLES():
+#     """ All constant variables for the main logic of the program
+#         I separated this into a function to make tests.py function more cleanly
+#     """
+#
+#     """ --------------------------- MAIN VARIABLES
+#     """
+#     global COLOURS, VALUES, LETTERS, PATTERNS, STEPS, UNICODES, STANDARD_GAME
+#     global KING_AND_PAWN_GAME, MINOR_GAME, MAJOR_GAME, FRONT_LINE, BACK_LINE, FILES
+#     global IN_GAME_COMMANDS, TYPES
+#
+#     COLOURS = ('White', 'Black')
+#
+#     VALUES = {
+#         'Pawn': 1,
+#         'Rook': 5,
+#         'Knight': 3,
+#         'Bishop': 3,
+#         'King': 100,
+#         'Queen': 9,
+#     }
+#
+#     LETTERS = {
+#         'P': 'Pawn',
+#         'R': 'Rook',
+#         'N': 'Knight',
+#         'B': 'Bishop',
+#         'K': 'King',
+#         'Q': 'Queen',
+#         'E': 'Empty',
+#     }
+#
+#     TYPES = {
+#         'White': {
+#             'Pawn': 'P', 'Rook': 'R', 'Knight': 'N',
+#             'Bishop': 'B', 'King': 'K', 'Queen': 'Q'},
+#         'Black': {
+#             'Pawn': 'p', 'Rook': 'r', 'Knight': 'n',
+#             'Bishop': 'b', 'King': 'k', 'Queen': 'q'}
+#     }
+#
+#     PATTERNS = {
+#         'Pawn': [(1, 1), (1, -1)],
+#         'Rook': [(1, 0), (0, 1), (-1, 0), (0, -1)],
+#         'Knight': [(1, 2), (2, 1), (-1, 2), (2, -1), (-2, 1), (1, -2), (-1, -2), (-2, -1)],
+#         'Bishop': [(1, 1), (1, -1), (-1, 1), (-1, -1)],
+#         'King': [(0, 1), (1, 0), (1, 1), (-1, 0), (0, -1), (-1, 1), (1, -1), (-1, -1)],
+#         'Queen': [(0, 1), (1, 0), (1, 1), (-1, 0), (0, -1), (-1, 1), (1, -1), (-1, -1)],
+#     }
+#
+#     STEPS = {
+#         'Pawn': 1,
+#         'Rook': 7,
+#         'Knight': 1,
+#         'Bishop': 7,
+#         'King': 1,
+#         'Queen': 7,
+#     }
+#
+#     # The following have been designated THE WRONG WAY AROUND for the purposes of appearing more visually correct
+#     # on a white-black-inverted terminal window
+#     UNICODES = {
+#         'Black': {
+#             'Pawn': '♙',
+#             'Rook': '♖',
+#             'Knight': '♘',
+#             'Bishop': '♗',
+#             'King': '♔',
+#             'Queen': '♕',
+#         },
+#         'White': {
+#             'Pawn': '♟',
+#             'Rook': '♜',
+#             'Knight': '♞',
+#             'Bishop': '♝',
+#             'King': '♚',
+#             'Queen': '♛',
+#         },
+#     }
+#
+#     # Columns on which pieces start the game
+#     STANDARD_GAME = (0, 1, 2, 3, 4, 5, 6, 7)  # all pieces
+#     KING_AND_PAWN_GAME = 4,  # only the king
+#     MINOR_GAME = (1, 2, 4, 5, 6)  # minor pieces + king
+#     MAJOR_GAME = (0, 3, 4, 7)  # major pieces + king
+#
+#     # Pieces in the order they appear on the board - could add fischer-random at some point
+#     BACK_LINE = ('Rook', 'Knight', 'Bishop', 'Queen', 'King', 'Bishop', 'Knight', 'Rook')
+#
+#     # Files
+#     FILES = {'a': 0, 'b': 1, 'c': 2, 'd': 3, 'e': 4, 'f': 5, 'g': 6, 'h': 7}
+#
+#     # Non-move commands player can enter during a game
+#     IN_GAME_COMMANDS = ['resign', 'save', 'tmp', 'close']
 
 
 def TEST_STUFF():
@@ -1134,6 +1229,21 @@ def TEST_STUFF():
                         game_42, game_43, game_44, game_45, game_46, game_47, game_48, game_49]
 
 
+def strip_to_scripts(text):
+    new_text = text
+    new_text = re.sub(r'\{.*?\}', '', new_text)
+    new_text = re.sub(r'\d?\d\.\.?\.?', ' ', new_text)
+
+    moves = new_text.split()
+    white_script, black_script = [], []
+    while moves:
+        white_script.append(moves.pop(0))
+        if moves:
+            black_script.append(moves.pop(0))
+
+    return white_script, black_script
+
+
 """ UTILS --------------------------------------------------------------------------------------------------------------
 """
 
@@ -1285,33 +1395,6 @@ def decompose_san(san):
             result[i] = LETTERS[elem]
 
     return tuple(result)
-
-
-""" VARIOUS TEST FUNCTIONS ---------------------------------------------------------------------- VARIOUS TEST FUNCTIONS
-"""
-
-
-def strip_to_scripts(text):
-    new_text = text
-    new_text = re.sub(r'\{.*?\}', '', new_text)
-    new_text = re.sub(r'\d?\d\.\.?\.?', ' ', new_text)
-
-    moves = new_text.split()
-    white_script, black_script = [], []
-    while moves:
-        white_script.append(moves.pop(0))
-        if moves:
-            black_script.append(moves.pop(0))
-
-    return white_script, black_script
-
-
-""" GUI MANAGEMENT -------------------------------------------------------------------------------------- GUI MANAGEMENT 
-"""
-
-
-def gui_test():
-    pass
 
 
 """ MENU CONTROL FLOW -------------------------------------------------------------------------------- MAIN CONTROL FLOW 
@@ -2028,33 +2111,21 @@ def test_checkmates(legal_checkmates):
             print(f'game {index + 1} FAILED!')
 
 
+""" MAIN LOGIC ---------------------------------------------------------------------------------------------- MAIN LOGIC
+"""
 if __name__ == '__main__':
-    """ ------------------------------------------------- MAIN LOGIC ---------------------------------------------------
-    """
 
-    from Exceptions import *
-    from pathlib import Path
-    from timeit import default_timer as timer
-    import sys
-    import copy
-    import random
-    import os
-    # import pygame
-    # import kivy
-    import numpy
-    import math
-    MAIN_VARIABLES()
-    TEST_STUFF()
-
-    # for fen in fens:
-    #     convert_fen2board(fen)
-
-    main()
+    # TEST_STUFF()
 
     # for x in range(100):
     #     test()
     #     print(f'{x}, ' * 30)
 
+    # for fen in fens:
+    #     convert_fen2board(fen)
+
     # test_checkmates(legal_checkmates)
+
+    main()
 
 
