@@ -24,9 +24,10 @@ NOTE:
         'rank'; an element of the board.squares array, containing pieces and empty squares
         'col'; the integer index(0-7) of the boar.squares array pertaining to the file
         'board location'; the pair of indices (row, col) indexing a square (board.squares[row][col])
+        'SAN location'; a string of length two indicating a square on the board in Standard Algebraic Notation
 
 """
-""" IMPORTS & CONSTANT VARIABLES ---------------------------------------------------------- IMPORTS & CONSTANT VARIABLES
+""" IMPORTS & GLOBAL CONSTANTS  ------------------------------------------------------------- IMPORTS & GLOBAL CONSTANTS
 """
 
 from Exceptions import *
@@ -115,7 +116,7 @@ KING_AND_PAWN_GAME = 4,  # only the king
 MINOR_GAME = (1, 2, 4, 5, 6)  # minor pieces + king
 MAJOR_GAME = (0, 3, 4, 7)  # major pieces + king
 
-# Pieces in the order they appear on the board - could add fischer-random at some point
+# Pieces in the order they appear on the board - could add Fischer-random at some point
 BACK_LINE = ('Rook', 'Knight', 'Bishop', 'Queen', 'King', 'Bishop', 'Knight', 'Rook')
 
 # Files
