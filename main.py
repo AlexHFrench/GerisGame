@@ -258,7 +258,7 @@ class Board:
             if abs(start_row - end_row) == 2:  # ..making a double step..
                 path = squares_in_direction(start_location, target_location)
                 passant_location, = set(path) - {start_location}  # identify the 'single-step' square..
-                self.passant_loc = passant_location  # ..update the en_passant flag..
+                self.passant_loc = passant_location  # ..update the en_passant flag with that location..
                 self.passant_count = self.turn_count  # ..and start the timer
                 # THE FOLLOWING IS GHOST CODE, TO BE IMPLEMENTED IF X-FEN IS USED IN FUTURE!
                 # see >> https://en.wikipedia.org/wiki/X-FEN#Encoding_en-passant
@@ -305,7 +305,7 @@ class Board:
             In case of capture: active_piece.temp = target_piece s.t. target_piece.temp = Empty object
         """
         original_location = active_piece.location
-        if self.test_move(active_piece, target_location):  # if the move would not leave King in check..
+        if self.test_move(active_piece, target_location):  # if the move would not leave the King in check..
             self.blind_move(original_location, target_location)  # execute the move.
 
             # if it's a capture..
