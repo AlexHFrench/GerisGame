@@ -198,13 +198,13 @@ class Board:
                     continue
                 square.look(self)  # ..have it look at the board
 
-        # this handles niche case where two kings are "fighting over" a square
-        if kings:  # in case no kings on board, eg. empty board
-            kings[0].clear_vision()  # clear King vision
-            kings[1].clear_vision()  # clear King vision
+        # This handles niche case where two kings are "fighting over" a square
+        if kings:  # in the case no kings on board (eg. empty board)
+            kings[0].clear_vision()  # ..clear King vision
+            kings[1].clear_vision()  # ..clear King vision
 
-            if kings[0].colour == self.player_turn:  # then reinstate it..
-                kings[1].look(self)  # passive king first..
+            if kings[0].colour == self.player_turn:  # then reinstate vision..
+                kings[1].look(self)  # with passive king first..
                 kings[0].look(self)
             else:
                 kings[0].look(self)
@@ -222,20 +222,20 @@ class Board:
                 square = self.squares[row][col]  # for all squares..
                 if isinstance(square, Piece):  # if they contain a piece..
                     if colour is not None:
-                        if square.colour != colour:  # ..and match a supplied colour
+                        if square.colour != colour:  # ..and match a supplied colour..
                             continue
                     if type_ is not None:
-                        if not isinstance(square, eval(type_)):  # ..and match a supplied type
+                        if not isinstance(square, eval(type_)):  # ..and match a supplied type..
                             continue
-                    if move_vision is not None:  # ..and match a supplied move or capture
+                    if move_vision is not None:  # ..and match a supplied move or capture..
                         if move_vision not in square.avail_moves.union(square.avail_captures):
                             continue
-                    if in_check_vision is not None:  # ..and match a supplied checking distance
+                    if in_check_vision is not None:  # ..and match a supplied checking distance..
                         if in_check_vision not in square.check_vision:
                             continue
-                    pieces.append(square)  # collect them
+                    pieces.append(square)  # ..collect them
                     if expecting_one:  # if we are expecting to find only one piece..
-                        return pieces  # return it now instead of later
+                        return pieces  # ..return it now instead of later
         return pieces
 
     def blind_move(self, start_location, target_location):
