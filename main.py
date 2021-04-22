@@ -1744,10 +1744,7 @@ def convert_board2fen(board, tmp=False):
             txt.append('/')
 
     # COLOUR-TO-MOVE
-    if board.player_turn == 'White':
-        letter = 'w'
-    else:
-        letter = 'b'
+    letter = 'w' if board.player_turn == 'White' else 'b'
     txt.append(' ' + letter)
 
     # CASTLING LEGALITIES
