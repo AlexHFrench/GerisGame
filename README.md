@@ -13,5 +13,5 @@ Toy project - Creating a chess program
 # Conclusion
 
 
-#How to run
+# How to run
 
