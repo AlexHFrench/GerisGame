@@ -1,7 +1,7 @@
 # GerrysGame
 Toy project - Creating a chess program
 
-#Introduction
+# Introduction
 
 
 # Design
