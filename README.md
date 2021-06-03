@@ -72,12 +72,12 @@ There are several types of Draw possible in Chess:
 * Web Portal
 
 
-# Conclusion
+## Conclusion
 
 
 
 
-# How to run
+## How to run
 
 
 
