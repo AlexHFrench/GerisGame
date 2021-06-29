@@ -32,7 +32,7 @@ I also thought it natural that the Pieces "see" the board, in that they are resp
 Further, the `Board` should handle all elements of actually moving the Pieces and resetting itself to the previous state should the move prove to be illegal.
 Which meant the Board was also responsible for Checks and Mates and making the information available for Draw assessments (counting moves, storing board positions, etc.). 
 
-Each piece has knowledge of it's currently legal move, capture and any friendly pieces it is supporting.
+Each piece has knowledge of it's currently legal moves, captures and any friendly pieces it is supporting.
 `Knight`, `Bishop`, etcc. inherrit from `Piece` and all appart from `King` and `Pawn` are almost entirely generic. 
 
 I would come to see this for the error it was as it would bring about a circular dependency between the Kings (among other predictable problems).
