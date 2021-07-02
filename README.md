@@ -57,10 +57,8 @@ Followed the Python idiom ["Better to ask forgiveness than permission"](https://
 ### Game-types..
 
 One can play several types of game:
-* Standard 
-* King and Pawn
-* Minor Piece
-* Major Piece
+
+![](https://github.com/AlexHFrench/GerrysGame/blob/master/Img/game_mode_menu.png)
 
 ### Agents..
 
