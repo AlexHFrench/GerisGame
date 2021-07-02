@@ -76,6 +76,23 @@ One can set up a game between any arrangement of two kinds of player:
 
 
 ### Checks, Checkmates..
+
+The engine will catch Checks and Checkmates and, along with Draws, return the results of the game out of the game loop into the higher level of the menu system. (Though there is no implementation of any handling of that information.)
+
+This is a typical Checkmate:
+
+![](https://github.com/AlexHFrench/GerrysGame/blob/master/Img/checkmate.png)
+
+Kings know which squares they cannot move into in nearly all cases. As a result these squares do not populate their lists of available moves/captures.
+
+There is one case that is missed though, where they can move in the same direction as the attack of a Checking piece. Because the King obstructs the view of the target square the King believes it is not guarded. An Agent may then tell the King to move there and the game will try to do so.
+
+During step 4 of the validation process indicated above, on the test board, a search for on-board Checks is made. It is then noticed that this move would leave the King in check and the test board is discarded. The Agent prompted for another move and the attempted move is removeds from the King's lists of vissible squares. 
+
+This process can eb seen happening in the figure below.
+
+![](https://github.com/AlexHFrench/GerrysGame/blob/master/Img/move_into_check_edge_case.png)
+
 ### Draws..
 
 There are several types of Draw possible in Chess:
@@ -129,6 +146,7 @@ Notice the different input characters used, both 0 and O are recognised.
 * Fischer Random (Chess 960)
 * GUI
 * Web Portal
+* Game statistics and analysis (win:loss, average time per move, etc.)
 
 
 ## Conclusion
