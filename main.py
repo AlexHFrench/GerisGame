@@ -242,9 +242,9 @@ def agent_turn(board, active_player, passive_player):
 
     # Present agent opportunity to move/enter command..
     print(f"{active_player} to move:")
-    while True:  # This catches moving-into-check type illegal moves and checkmates/draws by process of elimination
+    while True:  # Catches anomalous moving-into-check type illegal moves and checkmates/draws by process of elimination
 
-        # Get agent move/input - contains a close program option
+        # Get agent move/input - contains a terminate program option
         active_piece, active_piece_type, target_location, is_capture, \
             promotion_type, castle_direction = active_player.get_input(board)
 
@@ -352,6 +352,7 @@ def main():
                 board = set_board(result)
                 decision = True
                 continue
+
             elif result == 5:  # Load from local Saved Game
                 print('Apologies, feature not yet implemented.\n')
                 pass
@@ -380,7 +381,7 @@ def main():
         # Initialise Agents..
         player1, player2 = assign_players()  # player1: "White" , player2: "Black"
         players = [player1, player2]
-        # Can happen due to loading game from FEN
+        # Can happen when loading game from FEN
         if board.player_turn == 'Black':
             players.reverse()
 

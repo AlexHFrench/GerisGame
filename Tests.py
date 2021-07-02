@@ -448,11 +448,14 @@ if __name__ == '__main__':
     from main import *
     import copy
     MAIN_VARIABLES()
+
     COLOURS = ('White', 'Black')
+
 
     """ Local imports and initialisation -----------------------------------------------------------------------------
     """
     SAN_TEST_STRINGS = (
+
         'e4', 'Nxf5', 'exd4', 'Rdf8', 'R1a3', 'Qh4e1',
         'Qh4xe1+', 'e8Q', 'fxe8Q#', 'f8N', '0-0', '0-0-0',
     )
