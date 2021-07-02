@@ -47,6 +47,15 @@ class Human(Agent):
                     print(f"Apologies, '{user_input}' failed to identify a unique, legal move.")
                     print(f'     :  {II}')
                     continue
+                # In case promotion identifier forgotten..
+                if (active_piece.__class__.__name__ == 'Pawn' and   # Moving piece is pawn..
+                        (target_location[0] == 0 or target_location[0] == 7) and  # and target square is final rank
+                        promotion_type == ''):  # .. and no promotion type is designated..
+                    print("\nThis move will promote the pawn! What to promote to?")
+                    print("k<N>ight <B>ishop <R>ook <Q>ueen")  # prompt user for info.
+                    choice = input("    :    ").upper()
+                    if choice in ['N', 'B', 'R', 'Q']:
+                        promotion_type = Globals.LETTERS[choice]
                 return active_piece, active_piece_type, target_location, is_capture, promotion_type, castle_direction
 
             # COMMAND PARSING AND ACTION
