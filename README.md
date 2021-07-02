@@ -50,9 +50,14 @@ I decided to validate a given move in several stages.
 3. Check the content of this "sentence" against the board state to verrify the pieces and squares involved actually exist and can see each other.
 4. Execute the move in a temporary copy of the Board to ensure legality of edge cases w.r.t Checks and Checkmates.
 
-Followed the Python idiom ["Better to ask forgiveness than permission"](https://devblogs.microsoft.com/python/idiomatic-python-eafp-versus-lbyl/#:~:text=One%20idiomatic%20practice%20in%20Python,ask%20for%20forgiveness%20than%20permission%E2%80%9D.) I built the validation layers assuming the phrase would parse and the move would be legal, catching any errors should the step fail and re-prompting the user for another move.
+Following the Python idiom ["Better to ask forgiveness than permission"](https://devblogs.microsoft.com/python/idiomatic-python-eafp-versus-lbyl/#:~:text=One%20idiomatic%20practice%20in%20Python,ask%20for%20forgiveness%20than%20permission%E2%80%9D.) I built the validation layers assuming the phrase *would* parse and the move *would* be legal, catching any errors should the step fail and re-prompting the user for another move.
 
 # Features
+
+### Board and Pieces..
+
+![](https://github.com/AlexHFrench/GerrysGame/blob/master/Img/standard_board.png)
+(depending on the font size of your terminal the file labels do or do not align)
 
 ### Game-types..
 
@@ -63,26 +68,59 @@ One can play several types of game:
 ### Agents..
 
 One can set up a game between any arrangement of two kinds of player:
+
 * Human Agent - controlled by a human player.
 * Random Agent - Selects a random piece to move, then selects a random move from among their legal moves/captures.
 
-### Board and Pieces..
-### Rules..
+![](https://github.com/AlexHFrench/GerrysGame/blob/master/Img/agent_creation_wizard.png)
+
+
 ### Checks, Checkmates..
 ### Draws..
 
 There are several types of Draw possible in Chess:
 * 3-fold repition
-* 50 move rule
-* Insufficient material
-* 
 
-### [FENs](https://en.wikipedia.org/wiki/Forsyth%E2%80%93Edwards_Notation)..
+![](https://github.com/AlexHFrench/GerrysGame/blob/master/Img/3-fold-repetition.png)
+
+Note the [rules](https://en.wikipedia.org/wiki/Threefold_repetition#:~:text=In%20chess%2C%20the%20threefold%20repetition,as%20triple%20occurrence%20of%20position.) of 3-fold-repetition. The castling rights and en-passant statuses must also be conserved for two positions to be considered equivalent.
+
+* 50 move rule
+
+![](https://github.com/AlexHFrench/GerrysGame/blob/master/Img/50_move_rule.png)
+* Insufficient material
+
+![](https://github.com/AlexHFrench/GerrysGame/blob/master/Img/draw_by_insufficient_material.png)
+
+### [FEN](https://en.wikipedia.org/wiki/Forsyth%E2%80%93Edwards_Notation)..
 
 Compressed format of board-state information storage.
+
 Used to load games into the engine from external sources (books, online games, historical games, etc.)
-A truncated form is used to store recent board states for Draw conditions.
+
+A truncated form is used to store recent board states for Draw conditions (see above).
+
 Would be used to store Save Game files in the event of implementation.
+
+
+### Additional Features..
+* Disambiguation of active piece in such cases where it my be ambiguous.
+
+![](https://github.com/AlexHFrench/GerrysGame/blob/master/Img/disambiguation.png)
+
+* Captures en-passant.
+* Castling.
+
+King side.
+![](https://github.com/AlexHFrench/GerrysGame/blob/master/Img/king_side_castling.png)
+
+Queen side.
+![](https://github.com/AlexHFrench/GerrysGame/blob/master/Img/queen_side_castling.png)
+
+Notice the different input characters used, both 0 and O are recognised.
+* Promotion.
+
+![](https://github.com/AlexHFrench/GerrysGame/blob/master/Img/promotion.png)
 
 ### Future Additions..
 * Draw By Agreement
