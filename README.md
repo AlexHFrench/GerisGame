@@ -33,7 +33,7 @@ Further, the `Board` should handle all elements of actually moving the Pieces an
 Which meant the Board was also responsible for Checks and Mates and making the information available for Draw assessments (counting moves, storing board positions, etc.). 
 
 Each piece has knowledge of it's currently legal moves, captures and any friendly pieces it is supporting.
-`Knight`, `Bishop`, etcc. inherrit from `Piece` and all appart from `King` and `Pawn` are almost entirely generic. 
+`Knight`, `Bishop`, etc. inherrit from `Piece` and all appart from `King` and `Pawn` are almost entirely generic. 
 
 I would come to see this for the error it was as it would bring about a circular dependency between the Kings (among other predictable problems).
 Navigating these issuee when they arose was fidly and my eventual solutions were inneficient and unnecessarily delicate for what seems a very generic set of problems.
@@ -45,12 +45,12 @@ This is a very common problem with poorly thougtht out OO architectures and I no
 The user input for making moves is handled in SAN (Standard Algebraic Notation) This is the most common notation and, in my opinion, the most intuitive.
 
 I decided to validate a given move in several stages. 
-1. All pieces know their movement rulse and can be called uppon to "look" at the board, populating all their curerntly legal moves into a list.
+1. All pieces know their movement rules and can be called uppon to "look" at the board, populating lists of their curerntly legal moves.
 2. Ensure the input is in the correct format and that it will convert into Chess language to make an actual "sentence" (eg. "Bishop to e4", "Queen takes e6")
 3. Check the content of this "sentence" against the board state to verrify the pieces and squares involved actually exist and can see each other.
 4. Execute the move in a temporary copy of the Board to ensure legality of edge cases w.r.t Checks and Checkmates.
 
-I followed the Python idiom ["Better to ask forgiveness than permission"](https://devblogs.microsoft.com/python/idiomatic-python-eafp-versus-lbyl/#:~:text=One%20idiomatic%20practice%20in%20Python,ask%20for%20forgiveness%20than%20permission%E2%80%9D.) and built the validation layers assuming the phrase would parse and the move would be legal, catching any errors should the step fail and re-prompting the user for another move.
+Followed the Python idiom ["Better to ask forgiveness than permission"](https://devblogs.microsoft.com/python/idiomatic-python-eafp-versus-lbyl/#:~:text=One%20idiomatic%20practice%20in%20Python,ask%20for%20forgiveness%20than%20permission%E2%80%9D.) I built the validation layers assuming the phrase would parse and the move would be legal, catching any errors should the step fail and re-prompting the user for another move.
 
 # Features
 
@@ -79,7 +79,13 @@ There are several types of Draw possible in Chess:
 * Insufficient material
 * 
 
-### FENs..
+### [FENs](https://en.wikipedia.org/wiki/Forsyth%E2%80%93Edwards_Notation)..
+
+Compressed format of board-state information storage.
+Used to load games into the engine from external sources (books, online games, historical games, etc.)
+A truncated form is used to store recent board states for Draw conditions.
+Would be used to store Save Game files in the event of implementation.
+
 ### Future Additions..
 * Draw By Agreement
 * Takebacks
