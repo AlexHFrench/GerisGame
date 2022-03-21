@@ -1,4 +1,4 @@
-# GerrysGame
+# Geri'sGame
 First project - Creating a chess program
 
 # Introduction
